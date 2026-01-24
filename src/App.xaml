@@ -5,23 +5,39 @@
              Exit="Application_Exit">
     <Application.Resources>
         <ResourceDictionary>
-            <!-- Colors -->
-            <Color x:Key="PrimaryColor">#2196F3</Color>
-            <Color x:Key="SuccessColor">#4CAF50</Color>
-            <Color x:Key="DangerColor">#F44336</Color>
-            <Color x:Key="WarningColor">#FF9800</Color>
-            <Color x:Key="MutedColor">#9E9E9E</Color>
+            <!-- Dark Theme Colors -->
+            <Color x:Key="BackgroundDark">#1a1a1a</Color>
+            <Color x:Key="BackgroundMedium">#252526</Color>
+            <Color x:Key="BackgroundLight">#2d2d30</Color>
+            <Color x:Key="BackgroundHover">#3e3e42</Color>
+            <Color x:Key="BorderColor">#3f3f46</Color>
+            <Color x:Key="TextPrimary">#e0e0e0</Color>
+            <Color x:Key="TextSecondary">#9d9d9d</Color>
+            <Color x:Key="AccentColor">#0078d4</Color>
+            <Color x:Key="AccentHover">#1a86d9</Color>
+            <Color x:Key="SuccessColor">#4ec469</Color>
+            <Color x:Key="DangerColor">#e74856</Color>
+            <Color x:Key="WarningColor">#fcb426</Color>
+            <Color x:Key="MutedColor">#6e6e6e</Color>
 
-            <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+            <SolidColorBrush x:Key="BackgroundDarkBrush" Color="{StaticResource BackgroundDark}"/>
+            <SolidColorBrush x:Key="BackgroundMediumBrush" Color="{StaticResource BackgroundMedium}"/>
+            <SolidColorBrush x:Key="BackgroundLightBrush" Color="{StaticResource BackgroundLight}"/>
+            <SolidColorBrush x:Key="BackgroundHoverBrush" Color="{StaticResource BackgroundHover}"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}"/>
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}"/>
+            <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+            <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHover}"/>
             <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
             <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
             <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
             <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}"/>
 
-            <!-- Button Style -->
+            <!-- Icon Button Style -->
             <Style x:Key="IconButtonStyle" TargetType="Button">
-                <Setter Property="Width" Value="28"/>
-                <Setter Property="Height" Value="28"/>
+                <Setter Property="Width" Value="32"/>
+                <Setter Property="Height" Value="32"/>
                 <Setter Property="Margin" Value="2,0"/>
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="BorderThickness" Value="0"/>
@@ -37,13 +53,13 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#E0E0E0"/>
+                                    <Setter Property="Background" Value="{StaticResource BackgroundHoverBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter Property="Background" Value="#BDBDBD"/>
+                                    <Setter Property="Background" Value="{StaticResource BackgroundLightBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Opacity" Value="0.5"/>
+                                    <Setter Property="Opacity" Value="0.4"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -51,13 +67,14 @@
                 </Setter>
             </Style>
 
-            <!-- Action Button Style -->
-            <Style x:Key="ActionButtonStyle" TargetType="Button">
-                <Setter Property="Padding" Value="12,6"/>
-                <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <!-- Primary Button Style -->
+            <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+                <Setter Property="Padding" Value="16,8"/>
+                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FontWeight" Value="Medium"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
@@ -70,10 +87,10 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#1976D2"/>
+                                    <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter Property="Background" Value="#1565C0"/>
+                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.5"/>
@@ -83,6 +100,83 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+
+            <!-- Secondary Button Style -->
+            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+                <Setter Property="Padding" Value="16,8"/>
+                <Setter Property="Background" Value="{StaticResource BackgroundLightBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FontWeight" Value="Medium"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BackgroundHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BackgroundLightBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ListBox Style -->
+            <Style x:Key="ModernListBoxStyle" TargetType="ListBox">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+            </Style>
+
+            <!-- ListBoxItem Style -->
+            <Style x:Key="ModernListBoxItemStyle" TargetType="ListBoxItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                <Setter Property="Padding" Value="12,10"/>
+                <Setter Property="Margin" Value="4,2"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BackgroundHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BackgroundLightBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ScrollBar Style -->
+            <Style TargetType="ScrollBar">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Width" Value="10"/>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

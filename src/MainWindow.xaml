@@ -5,9 +5,10 @@
         xmlns:vm="clr-namespace:ServiceHost.ViewModels"
         xmlns:models="clr-namespace:ServiceHost.Models"
         Title="ServiceHost"
-        Height="600" Width="900"
-        MinHeight="400" MinWidth="600"
-        WindowStartupLocation="CenterScreen">
+        Height="650" Width="1000"
+        MinHeight="450" MinWidth="700"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundDarkBrush}">
 
     <Window.Resources>
         <local:StatusToColorConverter x:Key="StatusToColorConverter"/>
@@ -21,8 +22,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <Border Grid.Row="0" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="8">
+        <!-- Header / Toolbar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BackgroundMediumBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -30,147 +35,224 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- Left: Action Buttons -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <Button Content="Start All"
                             Command="{Binding StartAllCommand}"
-                            Style="{StaticResource ActionButtonStyle}"
+                            Style="{StaticResource PrimaryButtonStyle}"
                             Margin="0,0,8,0"/>
                     <Button Content="Stop All"
                             Command="{Binding StopAllCommand}"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Background="#757575"/>
+                            Style="{StaticResource SecondaryButtonStyle}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="API: :" Foreground="#666"/>
-                    <TextBlock Text="{Binding ApiPort}" Foreground="#666" Margin="0,0,4,0"/>
-                    <Ellipse Width="8" Height="8"
-                             Fill="{StaticResource SuccessBrush}"
-                             VerticalAlignment="Center"/>
-                </StackPanel>
+                <!-- Right: API Status -->
+                <Border Grid.Column="2"
+                        Background="{StaticResource BackgroundLightBrush}"
+                        CornerRadius="4"
+                        Padding="12,6">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="API"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontWeight="Medium"
+                                   Margin="0,0,8,0"/>
+                        <TextBlock Text=":" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding ApiPort}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontWeight="Medium"
+                                   Margin="0,0,10,0"/>
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{StaticResource SuccessBrush}"
+                                 VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
         <!-- Main Content -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="200"/>
+                <ColumnDefinition Width="300" MinWidth="250"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*" MinWidth="300"/>
+                <ColumnDefinition Width="*" MinWidth="350"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Service List -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+            <!-- Service List Panel -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource BackgroundMediumBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Services"
-                           FontWeight="SemiBold"
-                           Padding="12,8"
-                           Background="#F5F5F5"/>
+                    <!-- Section Header -->
+                    <Border Grid.Row="0" Padding="16,14">
+                        <TextBlock Text="SERVICES"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   />
+                    </Border>
 
-                <ListBox Grid.Row="1"
-                         ItemsSource="{Binding Services}"
-                         SelectedItem="{Binding SelectedService}"
-                         BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Padding" Value="8,6"/>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                    <!-- Service List -->
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Services}"
+                             SelectedItem="{Binding SelectedService}"
+                             Style="{StaticResource ModernListBoxStyle}"
+                             ItemContainerStyle="{StaticResource ModernListBoxItemStyle}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Padding="4,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <!-- Status Indicator -->
-                                <Ellipse Grid.Column="0"
-                                         Width="10" Height="10"
-                                         Margin="0,0,8,0"
-                                         VerticalAlignment="Center"
-                                         Fill="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                    <!-- Status Indicator -->
+                                    <Ellipse Grid.Column="0"
+                                             Width="10" Height="10"
+                                             Margin="0,0,12,0"
+                                             VerticalAlignment="Center"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
 
-                                <!-- Service Name -->
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Name}"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
+                                    <!-- Service Info -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="13"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                        <TextBlock FontSize="11"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   Margin="0,2,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Stopped"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Running">
+                                                            <Setter Property="Text" Value="Running"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Starting">
+                                                            <Setter Property="Text" Value="Starting..."/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Stopping">
+                                                            <Setter Property="Text" Value="Stopping..."/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                            <Setter Property="Text" Value="Failed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
 
-                                <!-- Action Buttons -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                    <Button Command="{Binding StartCommand}"
-                                            Style="{StaticResource IconButtonStyle}"
-                                            ToolTip="Start"
-                                            IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
-                                        <TextBlock Text="▶" FontSize="10" Foreground="{StaticResource SuccessBrush}"/>
-                                    </Button>
-                                    <Button Command="{Binding StopCommand}"
-                                            Style="{StaticResource IconButtonStyle}"
-                                            ToolTip="Stop"
-                                            IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
-                                        <TextBlock Text="■" FontSize="10" Foreground="{StaticResource DangerBrush}"/>
-                                    </Button>
-                                    <Button Command="{Binding RestartCommand}"
-                                            Style="{StaticResource IconButtonStyle}"
-                                            ToolTip="Restart"
-                                            IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
-                                        <TextBlock Text="↻" FontSize="12" Foreground="{StaticResource PrimaryBrush}"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Grid>
+                                    <!-- Action Buttons -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                        <Button Command="{Binding StartCommand}"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                ToolTip="Start"
+                                                IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
+                                            <TextBlock Text="&#9654;" FontSize="10" Foreground="{StaticResource SuccessBrush}"/>
+                                        </Button>
+                                        <Button Command="{Binding StopCommand}"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                ToolTip="Stop"
+                                                IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
+                                            <TextBlock Text="&#9632;" FontSize="11" Foreground="{StaticResource DangerBrush}"/>
+                                        </Button>
+                                        <Button Command="{Binding RestartCommand}"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                ToolTip="Restart"
+                                                IsEnabled="{Binding IsOperating, Converter={StaticResource InverseBoolConverter}}">
+                                            <TextBlock Text="&#8635;" FontSize="14" Foreground="{StaticResource AccentBrush}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
 
             <!-- Splitter -->
             <GridSplitter Grid.Column="1"
-                          Width="4"
-                          Background="#E0E0E0"
+                          Width="1"
+                          Background="{StaticResource BorderBrush}"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Stretch"/>
 
-            <!-- Log Viewer -->
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+            <!-- Log Viewer Panel -->
+            <Border Grid.Column="2" Background="{StaticResource BackgroundDarkBrush}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Padding="12,8"
-                           Background="#F5F5F5">
-                    <Run Text="Logs: " FontWeight="SemiBold"/>
-                    <Run Text="{Binding SelectedService.Name, Mode=OneWay, FallbackValue='(select a service)'}"/>
-                </TextBlock>
+                    <!-- Log Header -->
+                    <Border Grid.Row="0"
+                            Background="{StaticResource BackgroundMediumBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="16,14">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="LOGS"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       />
+                            <TextBlock Text=" — "
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding SelectedService.Name, FallbackValue='Select a service'}"
+                                       FontSize="11"
+                                       FontWeight="Medium"
+                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
 
-                <TextBox Grid.Row="1"
-                         Text="{Binding LogContent, Mode=OneWay}"
-                         IsReadOnly="True"
-                         FontFamily="Consolas"
-                         FontSize="12"
-                         Background="#1E1E1E"
-                         Foreground="#D4D4D4"
-                         BorderThickness="0"
-                         Padding="8"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto"
-                         x:Name="LogTextBox"/>
-            </Grid>
+                    <!-- Log Content -->
+                    <TextBox Grid.Row="1"
+                             Text="{Binding LogContent, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Cascadia Mono, Consolas, monospace"
+                             FontSize="12"
+                             Background="#0d0d0d"
+                             Foreground="#cccccc"
+                             BorderThickness="0"
+                             Padding="16,12"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             x:Name="LogTextBox">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="CaretBrush" Value="#cccccc"/>
+                                <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Grid>
+            </Border>
         </Grid>
 
         <!-- Status Bar -->
-        <Border Grid.Row="2" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="8,4">
-            <TextBlock Text="{Binding StatusText}" Foreground="#666"/>
+        <Border Grid.Row="2"
+                Background="{StaticResource BackgroundMediumBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,8">
+            <Grid>
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="12"/>
+            </Grid>
         </Border>
     </Grid>
 </Window>

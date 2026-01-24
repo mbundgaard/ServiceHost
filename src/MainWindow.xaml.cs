@@ -25,10 +25,10 @@ public partial class MainWindow : Window
 /// </summary>
 public class StatusToColorConverter : IValueConverter
 {
-    private static readonly SolidColorBrush GreenBrush = new(Color.FromRgb(76, 175, 80));   // Running
-    private static readonly SolidColorBrush GrayBrush = new(Color.FromRgb(158, 158, 158)); // Stopped
-    private static readonly SolidColorBrush RedBrush = new(Color.FromRgb(244, 67, 54));    // Failed
-    private static readonly SolidColorBrush OrangeBrush = new(Color.FromRgb(255, 152, 0)); // Starting/Stopping
+    private static readonly SolidColorBrush GreenBrush = new(Color.FromRgb(78, 196, 105));  // Running - #4ec469
+    private static readonly SolidColorBrush GrayBrush = new(Color.FromRgb(110, 110, 110)); // Stopped - #6e6e6e
+    private static readonly SolidColorBrush RedBrush = new(Color.FromRgb(231, 72, 86));    // Failed - #e74856
+    private static readonly SolidColorBrush OrangeBrush = new(Color.FromRgb(252, 180, 38)); // Starting/Stopping - #fcb426
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
