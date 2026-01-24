@@ -1,0 +1,21 @@
+# Build outputs
+bin/
+obj/
+publish/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Runtime
+logs/
+*.log
+
+# Configuration (keep template)
+ServiceHost.json
+
+# OS
+Thumbs.db
+.DS_Store
