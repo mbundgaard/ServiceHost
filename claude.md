@@ -32,12 +32,14 @@ src/
 ## HTTP API (localhost:9500)
 
 ```
-GET  /                          → API manifest + service status
+GET  /                          → API manifest + service status + tips
 GET  /services                  → List services
 GET  /services/{name}/logs      → Get logs (?tail=N)
-POST /services/start            → Start all
-POST /services/stop             → Stop all
-POST /services/restart          → Restart all
+POST /services/logs/clear       → Clear all logs
+POST /services/{name}/logs/clear → Clear one log
+POST /services/start            → Start all (parallel)
+POST /services/stop             → Stop all (parallel)
+POST /services/restart          → Restart all (parallel)
 POST /services/{name}/start     → Start one
 POST /services/{name}/stop      → Stop one
 POST /services/{name}/restart   → Restart one
@@ -56,12 +58,14 @@ POST /services/{name}/restart   → Restart one
       "args": ["run"],
       "workingDirectory": "./api",
       "port": 5000,
-      "readyPattern": null,
+      "url": "http://localhost:5000/health",
       "environment": {}
     }
   ]
 }
 ```
+
+Config auto-reloads on change - no restart needed.
 
 ## Key Behaviors
 
