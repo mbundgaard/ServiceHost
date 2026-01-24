@@ -1,0 +1,33 @@
+{
+  "apiPort": 9500,
+  "logDirectory": "./logs",
+  "services": [
+    {
+      "name": "api",
+      "command": "dotnet",
+      "args": ["run"],
+      "workingDirectory": "./api",
+      "port": 5000,
+      "environment": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "startupTimeoutSeconds": 60
+    },
+    {
+      "name": "python-executor",
+      "command": "python",
+      "args": ["-m", "uvicorn", "app.main:app", "--port", "8000"],
+      "workingDirectory": "./python-executor",
+      "port": 8000,
+      "startupTimeoutSeconds": 30
+    },
+    {
+      "name": "frontend",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "workingDirectory": "./app",
+      "port": 5173,
+      "startupTimeoutSeconds": 60
+    }
+  ]
+}
