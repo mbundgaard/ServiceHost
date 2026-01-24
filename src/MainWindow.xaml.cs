@@ -39,6 +39,11 @@ public partial class MainWindow : Window
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
     }
+
+    private void GitHub_Click(object sender, RoutedEventArgs e)
+    {
+        Process.Start(new ProcessStartInfo("https://github.com/mbundgaard/ServiceHost") { UseShellExecute = true });
+    }
 }
 
 /// <summary>
