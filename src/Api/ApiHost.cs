@@ -12,27 +12,75 @@ public class ApiHost : IDisposable
 {
     private readonly int _port;
     private readonly ProcessManager _processManager;
+    private readonly LogManager _logManager;
+    private readonly string _configPath;
     private WebApplication? _app;
     private Task? _runTask;
     private readonly CancellationTokenSource _cts = new();
 
     public bool IsRunning { get; private set; }
 
-    public ApiHost(int port, ProcessManager processManager)
+    public ApiHost(int port, ProcessManager processManager, LogManager logManager, string configPath)
     {
         _port = port;
         _processManager = processManager;
+        _logManager = logManager;
+        _configPath = configPath;
     }
 
     public void Start()
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{_port}");
-
-        // Disable default logging to console
         builder.Logging.ClearProviders();
 
         _app = builder.Build();
+
+        // GET / - API manifest with service status
+        _app.MapGet("/", () =>
+        {
+            var services = _processManager.Services.Values.Select(s => new
+            {
+                name = s.Config.Name,
+                status = s.Status.ToString().ToLowerInvariant(),
+                port = s.Config.Port,
+                pid = s.ProcessId,
+                command = $"{s.Config.Command} {string.Join(" ", s.Config.Args)}",
+                workingDirectory = s.Config.WorkingDirectory,
+                startedAt = s.StartedAt?.ToString("o"),
+                error = s.LastError
+            });
+
+            var manifest = new
+            {
+                name = "ServiceHost",
+                version = "1.0.0",
+                description = "Service manager with HTTP API for Claude Code",
+                configPath = _configPath,
+                endpoints = new Dictionary<string, string>
+                {
+                    ["GET /"] = "API description and service status",
+                    ["GET /services"] = "List all services",
+                    ["GET /services/{name}/logs?tail=N"] = "Get last N lines of logs (default 100)",
+                    ["POST /services/start"] = "Start all services",
+                    ["POST /services/stop"] = "Stop all services",
+                    ["POST /services/restart"] = "Restart all services",
+                    ["POST /services/{name}/start"] = "Start a service (blocks until ready)",
+                    ["POST /services/{name}/stop"] = "Stop a service (blocks until stopped)",
+                    ["POST /services/{name}/restart"] = "Restart a service"
+                },
+                examples = new Dictionary<string, string>
+                {
+                    ["start_one"] = $"curl -X POST http://localhost:{_port}/services/api/start",
+                    ["stop_one"] = $"curl -X POST http://localhost:{_port}/services/api/stop",
+                    ["start_all"] = $"curl -X POST http://localhost:{_port}/services/start",
+                    ["get_logs"] = $"curl http://localhost:{_port}/services/api/logs?tail=50"
+                },
+                services
+            };
+
+            return Results.Json(manifest, new JsonSerializerOptions { WriteIndented = true });
+        });
 
         // GET /services - List all services
         _app.MapGet("/services", () =>
@@ -41,13 +89,99 @@ public class ApiHost : IDisposable
             {
                 name = s.Config.Name,
                 status = s.Status.ToString().ToLowerInvariant(),
-                pid = s.ProcessId,
                 port = s.Config.Port,
+                pid = s.ProcessId,
+                command = $"{s.Config.Command} {string.Join(" ", s.Config.Args)}",
+                workingDirectory = s.Config.WorkingDirectory,
                 startedAt = s.StartedAt?.ToString("o"),
                 error = s.LastError
             });
 
             return Results.Json(new { services }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // GET /services/{name}/logs - Get log content
+        _app.MapGet("/services/{name}/logs", (string name, int? tail) =>
+        {
+            if (!_processManager.Services.ContainsKey(name))
+            {
+                return Results.Json(new { error = $"Service '{name}' not found" }, statusCode: 404);
+            }
+
+            var content = _logManager.GetLogContent(name);
+            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+            var tailCount = tail ?? 100;
+            if (tailCount > 0 && lines.Length > tailCount)
+            {
+                lines = lines.Skip(lines.Length - tailCount).ToArray();
+            }
+
+            return Results.Json(new
+            {
+                name,
+                lineCount = lines.Length,
+                logs = lines
+            }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // POST /services/start - Start all services
+        _app.MapPost("/services/start", async (CancellationToken ct) =>
+        {
+            var results = new List<object>();
+            foreach (var name in _processManager.Services.Keys)
+            {
+                var (success, error) = await _processManager.StartServiceAsync(name, ct);
+                var state = _processManager.Services[name];
+                results.Add(new
+                {
+                    name,
+                    success,
+                    status = state.Status.ToString().ToLowerInvariant(),
+                    pid = state.ProcessId,
+                    error
+                });
+            }
+            return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // POST /services/stop - Stop all services
+        _app.MapPost("/services/stop", async (CancellationToken ct) =>
+        {
+            var results = new List<object>();
+            foreach (var name in _processManager.Services.Keys)
+            {
+                var (success, error) = await _processManager.StopServiceAsync(name, ct);
+                var state = _processManager.Services[name];
+                results.Add(new
+                {
+                    name,
+                    success,
+                    status = state.Status.ToString().ToLowerInvariant(),
+                    error
+                });
+            }
+            return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // POST /services/restart - Restart all services
+        _app.MapPost("/services/restart", async (CancellationToken ct) =>
+        {
+            var results = new List<object>();
+            foreach (var name in _processManager.Services.Keys)
+            {
+                var (success, error) = await _processManager.RestartServiceAsync(name, ct);
+                var state = _processManager.Services[name];
+                results.Add(new
+                {
+                    name,
+                    success,
+                    status = state.Status.ToString().ToLowerInvariant(),
+                    pid = state.ProcessId,
+                    error
+                });
+            }
+            return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
         });
 
         // POST /services/{name}/start
@@ -148,7 +282,6 @@ public class ApiHost : IDisposable
             try
             {
                 await _app.StartAsync(_cts.Token);
-                // Wait until cancellation is requested
                 await Task.Delay(Timeout.Infinite, _cts.Token);
             }
             catch (OperationCanceledException)

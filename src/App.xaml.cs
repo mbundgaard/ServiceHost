@@ -58,7 +58,8 @@ public partial class App : Application
         await _processManager.DetectRunningServicesAsync();
 
         // Start API host
-        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager);
+        var configPath = Path.Combine(AppContext.BaseDirectory, "ServiceHost.json");
+        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, configPath);
         try
         {
             _apiHost.Start();
