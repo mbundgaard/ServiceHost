@@ -15,6 +15,14 @@ When Claude Code spawns services directly, processes can linger after the sessio
 - Provides clean start/stop/restart operations
 - Detects already-running services on startup
 
+Typical use cases:
+
+- **Backend API** - ASP.NET Core, Express, FastAPI, Go servers
+- **Frontend dev server** - Vite, Webpack, Next.js, Angular CLI
+- **Database** - Local PostgreSQL, Redis, MongoDB instances
+- **Workers** - Background job processors, queue consumers
+- **Sidecars** - Auth proxies, mock servers, local S3/Azure emulators
+
 ## Features
 
 - **WPF UI** - Dark themed interface with service list, controls, and log viewer
