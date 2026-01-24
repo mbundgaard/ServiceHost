@@ -6,6 +6,8 @@ A Windows WPF application that manages multiple services with an HTTP API design
 ![Windows](https://img.shields.io/badge/Platform-Windows-0078D6)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![ServiceHost UI](MainView.png)
+
 ## Why ServiceHost?
 
 When Claude Code spawns services directly, processes can linger after the session ends, leaving ports blocked and requiring manual cleanup. ServiceHost solves this by providing a dedicated service manager that:
