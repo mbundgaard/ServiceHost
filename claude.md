@@ -1,27 +1,49 @@
 # ServiceHost
 
-A Windows WPF application that hosts multiple services with an HTTP API for Claude Code interaction.
+Windows WPF application that manages services with an HTTP API for Claude Code.
 
-## Quick Start
+## Build Commands
 
-```bash
-cd src
-dotnet build
-dotnet run
+```powershell
+.\dev.ps1      # Build and run
+.\publish.ps1  # Create publish/ServiceHost.exe
 ```
 
-## Build & Publish
+## Project Structure
 
-```bash
-cd src
-dotnet publish -c Release -r win-x64
+```
+src/
+├── App.xaml(.cs)           # Application startup, dependency wiring
+├── MainWindow.xaml(.cs)    # WPF UI, dark theme
+├── Models/
+│   ├── ServiceConfig.cs    # JSON config model
+│   └── ServiceState.cs     # Runtime state (MVVM observable)
+├── Services/
+│   ├── ConfigurationService.cs  # Loads ServiceHost.json
+│   ├── ProcessManager.cs        # Start/stop/monitor processes
+│   ├── LogManager.cs            # Log file management
+│   └── ReadinessChecker.cs      # Port/pattern readiness
+├── Api/
+│   └── ApiHost.cs          # HTTP API (ASP.NET Core minimal API)
+└── ViewModels/
+    └── MainViewModel.cs    # MVVM bindings
 ```
 
-Output: `src/bin/Release/net8.0-windows/win-x64/publish/ServiceHost.exe`
+## HTTP API (localhost:9500)
 
-## Configuration
+```
+GET  /                          → API manifest + service status
+GET  /services                  → List services
+GET  /services/{name}/logs      → Get logs (?tail=N)
+POST /services/start            → Start all
+POST /services/stop             → Stop all
+POST /services/restart          → Restart all
+POST /services/{name}/start     → Start one
+POST /services/{name}/stop      → Stop one
+POST /services/{name}/restart   → Restart one
+```
 
-Create `ServiceHost.json` in the working directory:
+## Configuration (ServiceHost.json)
 
 ```json
 {
@@ -29,10 +51,10 @@ Create `ServiceHost.json` in the working directory:
   "logDirectory": "./logs",
   "services": [
     {
-      "name": "myservice",
+      "name": "api",
       "command": "dotnet",
       "args": ["run"],
-      "workingDirectory": "./myproject",
+      "workingDirectory": "./api",
       "port": 5000,
       "readyPattern": null,
       "environment": {}
@@ -41,51 +63,10 @@ Create `ServiceHost.json` in the working directory:
 }
 ```
 
-## HTTP API (localhost:9500)
+## Key Behaviors
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/services` | GET | List all services with status |
-| `/services/{name}/start` | POST | Start service (blocks until ready) |
-| `/services/{name}/stop` | POST | Stop service (blocks until stopped) |
-| `/services/{name}/restart` | POST | Restart service (blocks until ready) |
-
-### Response Format
-
-```json
-// Success
-{ "success": true, "name": "api", "status": "running", "pid": 12345 }
-
-// Failure
-{ "success": false, "name": "api", "error": "Timeout waiting for port 5000" }
-
-// GET /services
-{
-  "services": [
-    { "name": "api", "status": "running", "pid": 12345, "port": 5000 }
-  ]
-}
-```
-
-## Architecture
-
-```
-ServiceHost.exe
-├── HTTP API (localhost:9500)
-├── WPF UI (service list, controls, log viewer)
-└── Process Manager (spawn/kill, stdout/stderr capture, logs)
-```
-
-## Key Files
-
-- `src/Models/ServiceConfig.cs` - Configuration model
-- `src/Models/ServiceState.cs` - Runtime state
-- `src/Services/ProcessManager.cs` - Process lifecycle management
-- `src/Services/LogManager.cs` - Log file management
-- `src/Services/ReadinessChecker.cs` - Port/pattern readiness detection
-- `src/Api/ApiHost.cs` - HTTP API endpoints
-- `src/ViewModels/MainViewModel.cs` - WPF MVVM binding
-
-## Logs
-
-Logs are written to `logs/{servicename}.log` with timestamps. Log files are truncated on service start/restart.
+- **Readiness**: Blocks until port accepts connections or pattern matches stdout
+- **Persistence**: Services keep running when UI closes
+- **Detection**: On startup, detects already-running services by checking ports
+- **Logs**: Truncated on start/restart, timestamped, accessible via API
+- **Stop**: Graceful shutdown first, then force kill after timeout
