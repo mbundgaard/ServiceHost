@@ -233,25 +233,34 @@
                                            Foreground="{StaticResource TextPrimaryBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding SelectedService.Url, Mode=OneWay}"
-                                       FontSize="11"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       VerticalAlignment="Center"
-                                       Cursor="Hand"
-                                       ToolTip="Open in browser"
-                                       MouseLeftButtonUp="ServiceUrl_Click"
-                                       Visibility="{Binding SelectedService.HasUrl, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="TextDecorations" Value="Underline"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding SelectedService.Url, Mode=OneWay}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           VerticalAlignment="Center"
+                                           Cursor="Hand"
+                                           ToolTip="Open in browser"
+                                           MouseLeftButtonUp="ServiceUrl_Click"
+                                           Margin="0,0,12,0"
+                                           Visibility="{Binding SelectedService.HasUrl, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="TextDecorations" Value="Underline"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Button Command="{Binding ClearLogCommand}"
+                                        Style="{StaticResource IconButtonStyle}"
+                                        ToolTip="Clear log"
+                                        Width="24" Height="24"
+                                        Visibility="{Binding HasSelectedService, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="&#128465;" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
 

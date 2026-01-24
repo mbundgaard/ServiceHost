@@ -34,6 +34,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public int ApiPort => _apiPort;
     public string ConfigPath => _configPath;
     public string WindowTitle { get; }
+    public bool HasSelectedService => SelectedService != null;
 
     public MainViewModel(ProcessManager processManager, LogManager logManager, int apiPort, string configPath, string folderName)
     {
@@ -75,6 +76,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             LogContent = string.Empty;
         }
+        OnPropertyChanged(nameof(HasSelectedService));
     }
 
     private void OnLogLineReceived(string serviceName, string line)
@@ -119,6 +121,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         var prompt = $@"Use curl to discover the ServiceHost API at http://localhost:{_apiPort}/ - it will return a JSON manifest describing all available endpoints and the current status of configured services. Use this API to start, stop, restart services and view logs as needed.";
         Clipboard.SetText(prompt);
+    }
+
+    [RelayCommand]
+    private void ClearLog()
+    {
+        if (SelectedService != null)
+        {
+            _logManager.ResetLog(SelectedService.Name);
+            LogContent = string.Empty;
+        }
     }
 
     [RelayCommand]
