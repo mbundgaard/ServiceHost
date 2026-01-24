@@ -257,9 +257,16 @@
                                         Style="{StaticResource IconButtonStyle}"
                                         ToolTip="Clear log"
                                         Width="24" Height="24"
+                                        Margin="0,0,8,0"
                                         Visibility="{Binding HasSelectedService, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="&#128465;" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 </Button>
+                                <CheckBox x:Name="WordWrapCheckBox"
+                                          Content="Wrap"
+                                          IsChecked="True"
+                                          Foreground="{StaticResource TextSecondaryBrush}"
+                                          VerticalAlignment="Center"
+                                          FontSize="11"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -274,7 +281,6 @@
                              Foreground="#cccccc"
                              BorderThickness="0"
                              Padding="16,12"
-                             TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
                              x:Name="LogTextBox">
@@ -282,6 +288,12 @@
                             <Style TargetType="TextBox">
                                 <Setter Property="CaretBrush" Value="#cccccc"/>
                                 <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="TextWrapping" Value="NoWrap"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=WordWrapCheckBox}" Value="True">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
                             </Style>
                         </TextBox.Style>
                     </TextBox>

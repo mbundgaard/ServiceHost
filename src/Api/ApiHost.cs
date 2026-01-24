@@ -121,19 +121,31 @@ public class ApiHost : IDisposable
                     ["GET /"] = "API description and service status",
                     ["GET /services"] = "List all services",
                     ["GET /services/{name}/logs?tail=N"] = "Get last N lines of logs (default 100)",
-                    ["POST /services/start"] = "Start all services",
-                    ["POST /services/stop"] = "Stop all services",
-                    ["POST /services/restart"] = "Restart all services",
+                    ["POST /services/logs/clear"] = "Clear logs for all services",
+                    ["POST /services/{name}/logs/clear"] = "Clear log for one service",
+                    ["POST /services/start"] = "Start all services (parallel)",
+                    ["POST /services/stop"] = "Stop all services (parallel)",
+                    ["POST /services/restart"] = "Restart all services (parallel)",
                     ["POST /services/{name}/start"] = "Start a service (blocks until ready)",
                     ["POST /services/{name}/stop"] = "Stop a service (blocks until stopped)",
                     ["POST /services/{name}/restart"] = "Restart a service"
+                },
+                tips = new[]
+                {
+                    "Logs are auto-cleared on start/restart. Use clear to remove old entries before testing, so subsequent log fetches show only relevant output.",
+                    "Batch operations (start/stop/restart all) run in parallel for faster execution.",
+                    "Start blocks until the port accepts connections, so when it returns the service is ready to use.",
+                    "Use ?tail=N on the logs endpoint to limit output and avoid large responses.",
+                    "Starting an already-running service returns success immediately (idempotent).",
+                    "Services keep running even when the UI is closed - they persist until explicitly stopped."
                 },
                 examples = new Dictionary<string, string>
                 {
                     ["start_one"] = $"curl -X POST http://localhost:{_port}/services/api/start",
                     ["stop_one"] = $"curl -X POST http://localhost:{_port}/services/api/stop",
                     ["start_all"] = $"curl -X POST http://localhost:{_port}/services/start",
-                    ["get_logs"] = $"curl http://localhost:{_port}/services/api/logs?tail=50"
+                    ["get_logs"] = $"curl http://localhost:{_port}/services/api/logs?tail=50",
+                    ["clear_log"] = $"curl -X POST http://localhost:{_port}/services/api/logs/clear"
                 },
                 services
             };
@@ -184,6 +196,29 @@ public class ApiHost : IDisposable
                 lineCount = lines.Length,
                 logs = lines
             }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // POST /services/{name}/logs/clear - Clear log for one service
+        _app.MapPost("/services/{name}/logs/clear", (string name) =>
+        {
+            if (!_processManager.Services.ContainsKey(name))
+            {
+                return Results.Json(new { error = $"Service '{name}' not found" }, statusCode: 404);
+            }
+
+            _logManager.ResetLog(name);
+            return Results.Json(new { success = true, name, message = "Log cleared" });
+        });
+
+        // POST /services/logs/clear - Clear logs for all services
+        _app.MapPost("/services/logs/clear", () =>
+        {
+            var names = _processManager.Services.Keys.ToList();
+            foreach (var name in names)
+            {
+                _logManager.ResetLog(name);
+            }
+            return Results.Json(new { success = true, cleared = names });
         });
 
         // POST /services/start - Start all services (parallel)

@@ -119,7 +119,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CopyPrompt()
     {
-        var prompt = $@"Use curl to discover the ServiceHost API at http://localhost:{_apiPort}/ - it will return a JSON manifest describing all available endpoints and the current status of configured services. Use this API to start, stop, restart services and view logs as needed.";
+        var prompt = $@"Use curl to discover the ServiceHost API at http://localhost:{_apiPort}/ - it will return a JSON manifest describing all available endpoints and the current status of configured services.";
         Clipboard.SetText(prompt);
     }
 
