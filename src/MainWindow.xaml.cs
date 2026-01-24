@@ -1,8 +1,11 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using ServiceHost.Models;
+using ServiceHost.ViewModels;
 
 namespace ServiceHost;
 
@@ -17,6 +20,24 @@ public partial class MainWindow : Window
         {
             LogTextBox.ScrollToEnd();
         };
+    }
+
+    private void ConfigPath_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && !string.IsNullOrEmpty(vm.ConfigPath))
+        {
+            // Open Explorer and select the config file
+            Process.Start("explorer.exe", $"/select,\"{vm.ConfigPath}\"");
+        }
+    }
+
+    private void ServiceUrl_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.SelectedService?.Url is string url && !string.IsNullOrEmpty(url))
+        {
+            // Open URL in default browser
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
     }
 }
 
@@ -73,5 +94,25 @@ public class InverseBoolConverter : IValueConverter
             return !b;
         }
         return false;
+    }
+}
+
+/// <summary>
+/// Converts bool to Visibility
+/// </summary>
+public class BoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool b && b)
+        {
+            return Visibility.Visible;
+        }
+        return Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
     }
 }

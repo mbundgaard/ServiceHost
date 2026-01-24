@@ -8,8 +8,10 @@ public class ConfigurationService
 {
     private const string ConfigFileName = "ServiceHost.json";
     private readonly string _configPath;
+    private DateTime _lastModified;
 
     public AppConfig Config { get; private set; } = new();
+    public string ConfigPath => _configPath;
 
     public ConfigurationService()
     {
@@ -19,6 +21,40 @@ public class ConfigurationService
     public ConfigurationService(string configPath)
     {
         _configPath = configPath;
+    }
+
+    /// <summary>
+    /// Check if the config file has changed since last load.
+    /// </summary>
+    public bool HasConfigChanged()
+    {
+        if (!File.Exists(_configPath))
+            return false;
+
+        var currentModified = File.GetLastWriteTimeUtc(_configPath);
+        return currentModified > _lastModified;
+    }
+
+    /// <summary>
+    /// Reload the config if it has changed. Returns the list of changes.
+    /// </summary>
+    public async Task<ConfigChanges?> ReloadIfChangedAsync()
+    {
+        if (!HasConfigChanged())
+            return null;
+
+        var oldServices = Config.Services.Select(s => s.Name).ToHashSet();
+
+        if (!await LoadAsync())
+            return null;
+
+        var newServices = Config.Services.Select(s => s.Name).ToHashSet();
+
+        return new ConfigChanges
+        {
+            Added = newServices.Except(oldServices).ToList(),
+            Removed = oldServices.Except(newServices).ToList()
+        };
     }
 
     public async Task<bool> LoadAsync()
@@ -41,6 +77,7 @@ public class ConfigurationService
             if (config != null)
             {
                 Config = config;
+                _lastModified = File.GetLastWriteTimeUtc(_configPath);
                 return true;
             }
         }
@@ -91,4 +128,11 @@ public class ConfigurationService
         });
         await File.WriteAllTextAsync(path, json);
     }
+}
+
+public class ConfigChanges
+{
+    public List<string> Added { get; init; } = new();
+    public List<string> Removed { get; init; } = new();
+    public bool HasChanges => Added.Count > 0 || Removed.Count > 0;
 }

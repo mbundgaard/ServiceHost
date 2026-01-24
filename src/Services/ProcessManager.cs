@@ -9,7 +9,8 @@ public class ProcessManager : IDisposable
 {
     private readonly LogManager _logManager;
     private readonly Dictionary<string, ServiceState> _services = new();
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly Dictionary<string, SemaphoreSlim> _serviceLocks = new();
+    private readonly object _lockSync = new();
     private bool _disposed;
 
     public IReadOnlyDictionary<string, ServiceState> Services => _services;
@@ -24,7 +25,44 @@ public class ProcessManager : IDisposable
     public void RegisterService(ServiceConfig config)
     {
         _services[config.Name] = new ServiceState(config);
+        lock (_lockSync)
+        {
+            _serviceLocks[config.Name] = new SemaphoreSlim(1, 1);
+        }
     }
+
+    private SemaphoreSlim GetServiceLock(string name)
+    {
+        lock (_lockSync)
+        {
+            if (!_serviceLocks.TryGetValue(name, out var serviceLock))
+            {
+                serviceLock = new SemaphoreSlim(1, 1);
+                _serviceLocks[name] = serviceLock;
+            }
+            return serviceLock;
+        }
+    }
+
+    /// <summary>
+    /// Unregister a service. Stops it first if running.
+    /// </summary>
+    public async Task UnregisterServiceAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (_services.TryGetValue(name, out var state))
+        {
+            if (state.Status == ServiceStatus.Running || state.Status == ServiceStatus.Starting)
+            {
+                await StopServiceAsync(name, cancellationToken);
+            }
+            _services.Remove(name);
+        }
+    }
+
+    /// <summary>
+    /// Check if a service exists.
+    /// </summary>
+    public bool HasService(string name) => _services.ContainsKey(name);
 
     /// <summary>
     /// Detect services that are already running by checking if their ports are in use.
@@ -70,13 +108,15 @@ public class ProcessManager : IDisposable
 
     public async Task<(bool success, string? error)> StartServiceAsync(string name, CancellationToken cancellationToken = default)
     {
-        await _lock.WaitAsync(cancellationToken);
+        if (!_services.TryGetValue(name, out var state))
+        {
+            return (false, $"Service '{name}' not found");
+        }
+
+        var serviceLock = GetServiceLock(name);
+        await serviceLock.WaitAsync(cancellationToken);
         try
         {
-            if (!_services.TryGetValue(name, out var state))
-            {
-                return (false, $"Service '{name}' not found");
-            }
 
             if (state.Status == ServiceStatus.Running)
             {
@@ -202,20 +242,21 @@ public class ProcessManager : IDisposable
         }
         finally
         {
-            _lock.Release();
+            serviceLock.Release();
         }
     }
 
     public async Task<(bool success, string? error)> StopServiceAsync(string name, CancellationToken cancellationToken = default)
     {
-        await _lock.WaitAsync(cancellationToken);
+        if (!_services.TryGetValue(name, out var state))
+        {
+            return (false, $"Service '{name}' not found");
+        }
+
+        var serviceLock = GetServiceLock(name);
+        await serviceLock.WaitAsync(cancellationToken);
         try
         {
-            if (!_services.TryGetValue(name, out var state))
-            {
-                return (false, $"Service '{name}' not found");
-            }
-
             if (state.Status == ServiceStatus.Stopped)
             {
                 return (true, null);
@@ -312,7 +353,7 @@ public class ProcessManager : IDisposable
         }
         finally
         {
-            _lock.Release();
+            serviceLock.Release();
         }
     }
 
@@ -416,6 +457,13 @@ public class ProcessManager : IDisposable
         _disposed = true;
 
         // Don't stop services - just clean up resources
-        _lock.Dispose();
+        lock (_lockSync)
+        {
+            foreach (var serviceLock in _serviceLocks.Values)
+            {
+                serviceLock.Dispose();
+            }
+            _serviceLocks.Clear();
+        }
     }
 }

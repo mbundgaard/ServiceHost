@@ -153,7 +153,10 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ListBoxItem">
-                            <Border Background="{TemplateBinding Background}"
+                            <Border x:Name="ItemBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderThickness="3,0,0,0"
+                                    BorderBrush="Transparent"
                                     CornerRadius="6"
                                     Padding="{TemplateBinding Padding}">
                                 <ContentPresenter/>
@@ -164,6 +167,7 @@
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
                                     <Setter Property="Background" Value="{StaticResource BackgroundLightBrush}"/>
+                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

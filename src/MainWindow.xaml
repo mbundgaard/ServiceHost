@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:ServiceHost"
         xmlns:vm="clr-namespace:ServiceHost.ViewModels"
         xmlns:models="clr-namespace:ServiceHost.Models"
-        Title="ServiceHost"
+        Title="{Binding WindowTitle}"
         Height="650" Width="1000"
         MinHeight="450" MinWidth="700"
         WindowStartupLocation="CenterScreen"
@@ -13,6 +13,7 @@
     <Window.Resources>
         <local:StatusToColorConverter x:Key="StatusToColorConverter"/>
         <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Window.Resources>
 
     <Grid>
@@ -46,26 +47,37 @@
                             Style="{StaticResource SecondaryButtonStyle}"/>
                 </StackPanel>
 
-                <!-- Right: API Status -->
-                <Border Grid.Column="2"
-                        Background="{StaticResource BackgroundLightBrush}"
-                        CornerRadius="4"
-                        Padding="12,6">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="API"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontWeight="Medium"
-                                   Margin="0,0,8,0"/>
-                        <TextBlock Text=":" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <TextBlock Text="{Binding ApiPort}"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   FontWeight="Medium"
-                                   Margin="0,0,10,0"/>
-                        <Ellipse Width="8" Height="8"
-                                 Fill="{StaticResource SuccessBrush}"
-                                 VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                <!-- Right: Copy Prompt + API Status -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Command="{Binding CopyPromptCommand}"
+                            ToolTip="Copy Claude Code prompt to clipboard"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Margin="0,0,12,0"
+                            Padding="10,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#128203;" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="Copy Prompt"/>
+                        </StackPanel>
+                    </Button>
+                    <Border Background="{StaticResource BackgroundLightBrush}"
+                            CornerRadius="4"
+                            Padding="12,6">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="API"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontWeight="Medium"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Text=":" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding ApiPort}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="Medium"
+                                       Margin="0,0,10,0"/>
+                            <Ellipse Width="8" Height="8"
+                                     Fill="{StaticResource SuccessBrush}"
+                                     VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -201,20 +213,46 @@
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="0,0,0,1"
                             Padding="16,14">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="LOGS"
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="LOGS"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text=" — "
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding SelectedService.Name, FallbackValue='Select a service', Mode=OneWay}"
+                                           FontSize="11"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding SelectedService.Url, Mode=OneWay}"
                                        FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       />
-                            <TextBlock Text=" — "
-                                       FontSize="11"
-                                       Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding SelectedService.Name, FallbackValue='Select a service'}"
-                                       FontSize="11"
-                                       FontWeight="Medium"
-                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                        </StackPanel>
+                                       Foreground="{StaticResource AccentBrush}"
+                                       VerticalAlignment="Center"
+                                       Cursor="Hand"
+                                       ToolTip="Open in browser"
+                                       MouseLeftButtonUp="ServiceUrl_Click"
+                                       Visibility="{Binding SelectedService.HasUrl, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="TextDecorations" Value="Underline"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
                     </Border>
 
                     <!-- Log Content -->
@@ -249,9 +287,21 @@
                 BorderThickness="0,1,0,0"
                 Padding="16,8">
             <Grid>
-                <TextBlock Text="{Binding StatusText}"
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusText}"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            FontSize="12"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="v1.0.0"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
             </Grid>
         </Border>
     </Grid>

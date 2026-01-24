@@ -58,8 +58,7 @@ public partial class App : Application
         await _processManager.DetectRunningServicesAsync();
 
         // Start API host
-        var configPath = Path.Combine(AppContext.BaseDirectory, "ServiceHost.json");
-        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, configPath);
+        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, _configService);
         try
         {
             _apiHost.Start();
@@ -76,7 +75,8 @@ public partial class App : Application
         }
 
         // Create view model
-        _viewModel = new MainViewModel(_processManager, _logManager, _configService.Config.ApiPort);
+        var folderName = new DirectoryInfo(AppContext.BaseDirectory).Name;
+        _viewModel = new MainViewModel(_processManager, _logManager, _configService.Config.ApiPort, _configService.ConfigPath, folderName);
 
         // Create and show main window
         var mainWindow = new MainWindow

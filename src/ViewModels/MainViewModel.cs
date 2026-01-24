@@ -13,6 +13,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly ProcessManager _processManager;
     private readonly LogManager _logManager;
     private readonly int _apiPort;
+    private readonly string _configPath;
     private readonly DispatcherTimer _refreshTimer;
 
     [ObservableProperty]
@@ -31,12 +32,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _isApiRunning;
 
     public int ApiPort => _apiPort;
+    public string ConfigPath => _configPath;
+    public string WindowTitle { get; }
 
-    public MainViewModel(ProcessManager processManager, LogManager logManager, int apiPort)
+    public MainViewModel(ProcessManager processManager, LogManager logManager, int apiPort, string configPath, string folderName)
     {
         _processManager = processManager;
         _logManager = logManager;
         _apiPort = apiPort;
+        _configPath = configPath;
+        WindowTitle = $"ServiceHost — {folderName}";
 
         // Initialize service view models
         foreach (var state in processManager.Services.Values)
@@ -110,6 +115,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void CopyPrompt()
+    {
+        var prompt = $@"Use curl to discover the ServiceHost API at http://localhost:{_apiPort}/ - it will return a JSON manifest describing all available endpoints and the current status of configured services. Use this API to start, stop, restart services and view logs as needed.";
+        Clipboard.SetText(prompt);
+    }
+
+    [RelayCommand]
     private async Task StartAllAsync()
     {
         foreach (var service in Services)
@@ -162,6 +174,8 @@ public partial class ServiceItemViewModel : ObservableObject
     private readonly MainViewModel _parent;
 
     public string Name => _state.Config.Name;
+    public string? Url => _state.Config.Url;
+    public bool HasUrl => !string.IsNullOrEmpty(_state.Config.Url);
 
     [ObservableProperty]
     private ServiceStatus _status;

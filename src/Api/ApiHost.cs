@@ -13,6 +13,7 @@ public class ApiHost : IDisposable
     private readonly int _port;
     private readonly ProcessManager _processManager;
     private readonly LogManager _logManager;
+    private readonly ConfigurationService _configService;
     private readonly string _configPath;
     private WebApplication? _app;
     private Task? _runTask;
@@ -20,12 +21,47 @@ public class ApiHost : IDisposable
 
     public bool IsRunning { get; private set; }
 
-    public ApiHost(int port, ProcessManager processManager, LogManager logManager, string configPath)
+    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService)
     {
         _port = port;
         _processManager = processManager;
         _logManager = logManager;
-        _configPath = configPath;
+        _configService = configService;
+        _configPath = configService.ConfigPath;
+    }
+
+    /// <summary>
+    /// Check if config has changed and apply updates (add new services, remove deleted ones).
+    /// </summary>
+    private async Task<object?> CheckAndApplyConfigChangesAsync(CancellationToken ct)
+    {
+        var changes = await _configService.ReloadIfChangedAsync();
+        if (changes == null || !changes.HasChanges)
+            return null;
+
+        // Remove deleted services
+        foreach (var removed in changes.Removed)
+        {
+            await _processManager.UnregisterServiceAsync(removed, ct);
+        }
+
+        // Add new services
+        foreach (var added in changes.Added)
+        {
+            var config = _configService.Config.Services.FirstOrDefault(s => s.Name == added);
+            if (config != null)
+            {
+                _processManager.RegisterService(config);
+                await _processManager.DetectRunningServicesAsync();
+            }
+        }
+
+        return new
+        {
+            configReloaded = true,
+            added = changes.Added,
+            removed = changes.Removed
+        };
     }
 
     public void Start()
@@ -37,8 +73,9 @@ public class ApiHost : IDisposable
         _app = builder.Build();
 
         // GET / - API manifest with service status
-        _app.MapGet("/", () =>
+        _app.MapGet("/", async (CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             var services = _processManager.Services.Values.Select(s => new
             {
                 name = s.Config.Name,
@@ -57,6 +94,28 @@ public class ApiHost : IDisposable
                 version = "1.0.0",
                 description = "Service manager with HTTP API for Claude Code",
                 configPath = _configPath,
+                configuration = new
+                {
+                    note = "To add or remove services, edit the config file. Changes are auto-detected on next API request.",
+                    file = _configPath,
+                    format = new
+                    {
+                        services = new[]
+                        {
+                            new
+                            {
+                                name = "service-name",
+                                command = "executable",
+                                args = new[] { "arg1", "arg2" },
+                                workingDirectory = "./path",
+                                port = 5000,
+                                url = "http://localhost:5000/health",
+                                environment = new Dictionary<string, string> { ["KEY"] = "value" },
+                                startupTimeoutSeconds = 30
+                            }
+                        }
+                    }
+                },
                 endpoints = new Dictionary<string, string>
                 {
                     ["GET /"] = "API description and service status",
@@ -83,8 +142,9 @@ public class ApiHost : IDisposable
         });
 
         // GET /services - List all services
-        _app.MapGet("/services", () =>
+        _app.MapGet("/services", async (CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             var services = _processManager.Services.Values.Select(s => new
             {
                 name = s.Config.Name,
@@ -101,8 +161,9 @@ public class ApiHost : IDisposable
         });
 
         // GET /services/{name}/logs - Get log content
-        _app.MapGet("/services/{name}/logs", (string name, int? tail) =>
+        _app.MapGet("/services/{name}/logs", async (string name, int? tail, CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             if (!_processManager.Services.ContainsKey(name))
             {
                 return Results.Json(new { error = $"Service '{name}' not found" }, statusCode: 404);
@@ -125,68 +186,75 @@ public class ApiHost : IDisposable
             }, new JsonSerializerOptions { WriteIndented = true });
         });
 
-        // POST /services/start - Start all services
+        // POST /services/start - Start all services (parallel)
         _app.MapPost("/services/start", async (CancellationToken ct) =>
         {
-            var results = new List<object>();
-            foreach (var name in _processManager.Services.Keys)
+            await CheckAndApplyConfigChangesAsync(ct);
+            var names = _processManager.Services.Keys.ToList();
+            var tasks = names.Select(async name =>
             {
                 var (success, error) = await _processManager.StartServiceAsync(name, ct);
                 var state = _processManager.Services[name];
-                results.Add(new
+                return new
                 {
                     name,
                     success,
                     status = state.Status.ToString().ToLowerInvariant(),
                     pid = state.ProcessId,
                     error
-                });
-            }
+                };
+            });
+            var results = await Task.WhenAll(tasks);
             return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
         });
 
-        // POST /services/stop - Stop all services
+        // POST /services/stop - Stop all services (parallel)
         _app.MapPost("/services/stop", async (CancellationToken ct) =>
         {
-            var results = new List<object>();
-            foreach (var name in _processManager.Services.Keys)
+            await CheckAndApplyConfigChangesAsync(ct);
+            var names = _processManager.Services.Keys.ToList();
+            var tasks = names.Select(async name =>
             {
                 var (success, error) = await _processManager.StopServiceAsync(name, ct);
                 var state = _processManager.Services[name];
-                results.Add(new
+                return new
                 {
                     name,
                     success,
                     status = state.Status.ToString().ToLowerInvariant(),
                     error
-                });
-            }
+                };
+            });
+            var results = await Task.WhenAll(tasks);
             return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
         });
 
-        // POST /services/restart - Restart all services
+        // POST /services/restart - Restart all services (parallel)
         _app.MapPost("/services/restart", async (CancellationToken ct) =>
         {
-            var results = new List<object>();
-            foreach (var name in _processManager.Services.Keys)
+            await CheckAndApplyConfigChangesAsync(ct);
+            var names = _processManager.Services.Keys.ToList();
+            var tasks = names.Select(async name =>
             {
                 var (success, error) = await _processManager.RestartServiceAsync(name, ct);
                 var state = _processManager.Services[name];
-                results.Add(new
+                return new
                 {
                     name,
                     success,
                     status = state.Status.ToString().ToLowerInvariant(),
                     pid = state.ProcessId,
                     error
-                });
-            }
+                };
+            });
+            var results = await Task.WhenAll(tasks);
             return Results.Json(new { results }, new JsonSerializerOptions { WriteIndented = true });
         });
 
         // POST /services/{name}/start
         _app.MapPost("/services/{name}/start", async (string name, CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             var (success, error) = await _processManager.StartServiceAsync(name, ct);
 
             if (!_processManager.Services.TryGetValue(name, out var state))
@@ -218,6 +286,7 @@ public class ApiHost : IDisposable
         // POST /services/{name}/stop
         _app.MapPost("/services/{name}/stop", async (string name, CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             var (success, error) = await _processManager.StopServiceAsync(name, ct);
 
             if (!_processManager.Services.TryGetValue(name, out var state))
@@ -248,6 +317,7 @@ public class ApiHost : IDisposable
         // POST /services/{name}/restart
         _app.MapPost("/services/{name}/restart", async (string name, CancellationToken ct) =>
         {
+            await CheckAndApplyConfigChangesAsync(ct);
             var (success, error) = await _processManager.RestartServiceAsync(name, ct);
 
             if (!_processManager.Services.TryGetValue(name, out var state))

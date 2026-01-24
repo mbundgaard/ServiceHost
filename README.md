@@ -30,6 +30,8 @@ Typical use cases:
 - **Process Management** - Start, stop, restart services with stdout/stderr capture
 - **Readiness Detection** - Port-based or pattern-based startup detection
 - **Persistent Services** - Services keep running when UI closes
+- **Auto-Reload Config** - Edit `ServiceHost.json` and changes are picked up on next API request
+- **Copy Prompt** - One-click button copies a Claude Code prompt to your clipboard
 - **Claude Code Ready** - API returns manifest describing all available operations
 
 ## Quick Start
@@ -87,6 +89,7 @@ Create `ServiceHost.json` next to the executable:
 | `args` | Command-line arguments (array) |
 | `workingDirectory` | Working directory for the process |
 | `port` | TCP port to check for readiness (optional) |
+| `url` | Clickable URL shown in UI (e.g., health endpoint or main page) |
 | `readyPattern` | Regex pattern in stdout indicating readiness (optional) |
 | `environment` | Environment variables (optional) |
 | `startupTimeoutSeconds` | Readiness timeout (default: 30) |
@@ -168,6 +171,7 @@ The dark-themed UI provides:
 - **Service List** - Status indicator, name, and start/stop/restart buttons
 - **Log Viewer** - Real-time log display for selected service
 - **Batch Controls** - Start All / Stop All buttons
+- **Copy Prompt** - Copies a Claude Code prompt to clipboard for quick integration
 
 Status indicators:
 - Green: Running
@@ -180,8 +184,11 @@ Status indicators:
 ServiceHost is designed to work with Claude Code:
 
 1. Start ServiceHost with your project's services configured
-2. Claude Code fetches `http://localhost:9500/` to discover the API
-3. Claude Code can start/stop/restart services and fetch logs as needed
+2. Click **Copy Prompt** to copy a ready-to-use prompt to your clipboard
+3. Paste the prompt into Claude Code - it will discover the API via curl
+4. Claude Code can start/stop/restart services and fetch logs as needed
+
+The API manifest includes configuration details, so Claude Code knows how to add or modify services in `ServiceHost.json`. Changes are auto-detected on the next API request.
 
 Services persist when the UI closes, so you can:
 - Start services via the UI
