@@ -107,26 +107,62 @@ public class ApiHost : IDisposable
                 name = "ServiceHost",
                 version = versionInfo.CurrentVersion,
                 update,
-                description = "Service manager with HTTP API for Claude Code",
+                description = "Service manager with HTTP API for AI assistants",
                 configPath = _configPath,
-                configuration = new
+                addingServices = new
                 {
-                    note = "Services can be managed via API (POST/PUT/DELETE /services) or by editing the config file. File changes are auto-detected on next API request.",
-                    file = _configPath,
-                    format = new
+                    instructions = "POST to /services with a JSON body. Required: name, command. The service starts automatically after creation if you call the start endpoint.",
+                    fields = new Dictionary<string, string>
                     {
-                        services = new[]
+                        ["name"] = "Unique identifier (required). Used in API paths and log files. Avoid special characters.",
+                        ["command"] = "Executable to run (required). Use 'cmd' with '/c' prefix on Windows for npm/npx.",
+                        ["args"] = "Array of command-line arguments (optional).",
+                        ["workingDirectory"] = "Working directory for the process (optional). Relative to ServiceHost.exe location.",
+                        ["port"] = "TCP port to check for readiness (optional). Start blocks until port accepts connections.",
+                        ["url"] = "URL shown in UI for quick access (optional). E.g., health endpoint or main page.",
+                        ["environment"] = "Environment variables as key-value pairs (optional).",
+                        ["startupTimeoutSeconds"] = "Max seconds to wait for readiness (optional, default 30).",
+                        ["shutdownTimeoutSeconds"] = "Max seconds for graceful shutdown (optional, default 5)."
+                    },
+                    examples = new object[]
+                    {
+                        new
                         {
-                            new
+                            description = "Vite/React frontend",
+                            config = new
                             {
-                                name = "service-name",
-                                command = "executable",
-                                args = new[] { "arg1", "arg2" },
-                                workingDirectory = "./path",
+                                name = "frontend",
+                                command = "cmd",
+                                args = new[] { "/c", "npm", "run", "dev" },
+                                workingDirectory = "./app",
+                                port = 5173,
+                                url = "http://localhost:5173"
+                            }
+                        },
+                        new
+                        {
+                            description = "ASP.NET Core API",
+                            config = new
+                            {
+                                name = "api",
+                                command = "dotnet",
+                                args = new[] { "run" },
+                                workingDirectory = "./api",
                                 port = 5000,
                                 url = "http://localhost:5000/health",
-                                environment = new Dictionary<string, string> { ["KEY"] = "value" },
-                                startupTimeoutSeconds = 30
+                                environment = new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
+                            }
+                        },
+                        new
+                        {
+                            description = "Python FastAPI/Uvicorn",
+                            config = new
+                            {
+                                name = "python-api",
+                                command = "python",
+                                args = new[] { "-m", "uvicorn", "main:app", "--port", "8000" },
+                                workingDirectory = "./backend",
+                                port = 8000
                             }
                         }
                     }
