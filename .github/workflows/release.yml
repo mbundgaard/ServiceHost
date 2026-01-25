@@ -21,8 +21,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $latestTag = git describe --tags --abbrev=0 2>$null
-          if ($latestTag) {
+          $tags = git tag -l "v*" | Sort-Object -Descending { [int](($_ -replace '^v', '') -split '\.')[0] }
+          if ($tags) {
+            $latestTag = $tags | Select-Object -First 1
             $version = $latestTag -replace '^v', ''
             $major = [int]($version -split '\.')[0]
             $newMajor = $major + 1
