@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest version and increment major
+        id: version
+        shell: pwsh
+        run: |
+          $latestTag = git describe --tags --abbrev=0 2>$null
+          if ($latestTag) {
+            $version = $latestTag -replace '^v', ''
+            $major = [int]($version -split '\.')[0]
+            $newMajor = $major + 1
+          } else {
+            $newMajor = 1
+          }
+          $newVersion = "$newMajor.0.0"
+          echo "version=$newVersion" >> $env:GITHUB_OUTPUT
+          echo "tag=v$newVersion" >> $env:GITHUB_OUTPUT
+          echo "New version: $newVersion"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: |
+          dotnet publish src/ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.version }} -o publish
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ServiceHost ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: publish/ServiceHost.exe
