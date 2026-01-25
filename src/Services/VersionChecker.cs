@@ -35,7 +35,9 @@ public class VersionChecker : IDisposable
         var info = new VersionInfo
         {
             CurrentVersion = CurrentVersion,
-            DownloadUrl = DownloadUrl
+            DownloadUrl = DownloadUrl,
+            ExePath = Environment.ProcessPath ?? "",
+            ProcessId = Environment.ProcessId
         };
 
         // Use cached value if still valid
@@ -99,7 +101,6 @@ public class VersionInfo
     public string? LatestVersion { get; set; }
     public bool UpdateAvailable { get; set; }
     public string DownloadUrl { get; set; } = "";
-    public string? UpdateMessage => UpdateAvailable
-        ? $"Version {LatestVersion} is available. Download: {DownloadUrl}"
-        : null;
+    public string ExePath { get; set; } = "";
+    public int ProcessId { get; set; }
 }

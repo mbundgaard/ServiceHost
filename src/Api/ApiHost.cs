@@ -21,6 +21,7 @@ public class ApiHost : IDisposable
     private readonly CancellationTokenSource _cts = new();
 
     public bool IsRunning { get; private set; }
+    public event Action? ShutdownRequested;
 
     public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService, VersionChecker versionChecker)
     {
@@ -91,13 +92,21 @@ public class ApiHost : IDisposable
                 error = s.LastError
             });
 
+            object? update = versionInfo.UpdateAvailable ? new
+            {
+                currentVersion = versionInfo.CurrentVersion,
+                newVersion = versionInfo.LatestVersion,
+                downloadUrl = versionInfo.DownloadUrl,
+                exePath = versionInfo.ExePath,
+                processId = versionInfo.ProcessId,
+                instructions = "To update: 1) Download from downloadUrl to exePath.tmp, 2) POST /shutdown, 3) Wait for processId to exit, 4) Delete exePath, 5) Rename exePath.tmp to exePath, 6) Start exePath"
+            } : null;
+
             var manifest = new
             {
                 name = "ServiceHost",
                 version = versionInfo.CurrentVersion,
-                latestVersion = versionInfo.LatestVersion,
-                updateAvailable = versionInfo.UpdateAvailable,
-                updateMessage = versionInfo.UpdateMessage,
+                update,
                 description = "Service manager with HTTP API for Claude Code",
                 configPath = _configPath,
                 configuration = new
@@ -137,7 +146,8 @@ public class ApiHost : IDisposable
                     ["POST /services/restart"] = "Restart all services (parallel)",
                     ["POST /services/{name}/start"] = "Start a service (blocks until ready)",
                     ["POST /services/{name}/stop"] = "Stop a service (blocks until stopped)",
-                    ["POST /services/{name}/restart"] = "Restart a service"
+                    ["POST /services/{name}/restart"] = "Restart a service",
+                    ["POST /shutdown"] = "Shutdown the application (for updates)"
                 },
                 tips = new[]
                 {
@@ -164,7 +174,11 @@ public class ApiHost : IDisposable
                 services
             };
 
-            return Results.Json(manifest, new JsonSerializerOptions { WriteIndented = true });
+            return Results.Json(manifest, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            });
         });
 
         // GET /services - List all services
@@ -498,6 +512,23 @@ public class ApiHost : IDisposable
                     error
                 }, statusCode: 500);
             }
+        });
+
+        // POST /shutdown - Shutdown the application
+        _app.MapPost("/shutdown", () =>
+        {
+            // Trigger shutdown on a delay so we can return the response first
+            Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                ShutdownRequested?.Invoke();
+            });
+
+            return Results.Json(new
+            {
+                success = true,
+                message = "Shutdown initiated"
+            });
         });
 
         IsRunning = true;

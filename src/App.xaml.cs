@@ -63,6 +63,10 @@ public partial class App : Application
 
         // Start API host
         _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, _configService, _versionChecker);
+        _apiHost.ShutdownRequested += () =>
+        {
+            Dispatcher.Invoke(() => Shutdown());
+        };
         try
         {
             _apiHost.Start();
