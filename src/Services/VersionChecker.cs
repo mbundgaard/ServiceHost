@@ -27,7 +27,7 @@ public class VersionChecker : IDisposable
         // Get version from assembly (set during build)
         var assembly = Assembly.GetExecutingAssembly();
         var version = assembly.GetName().Version;
-        CurrentVersion = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "0.0.0";
+        CurrentVersion = version != null ? $"{version.Major}" : "0";
     }
 
     public async Task<VersionInfo> CheckForUpdateAsync()
@@ -57,7 +57,10 @@ public class VersionChecker : IDisposable
 
                 if (tagName != null)
                 {
-                    _latestVersion = tagName.TrimStart('v');
+                    // Extract just the major version number
+                    var versionStr = tagName.TrimStart('v');
+                    var majorStr = versionStr.Split('.')[0];
+                    _latestVersion = majorStr;
                     _lastCheck = DateTime.UtcNow;
 
                     info.LatestVersion = _latestVersion;
@@ -75,18 +78,10 @@ public class VersionChecker : IDisposable
 
     private static bool IsNewerVersion(string latest, string current)
     {
-        var latestParts = latest.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
-        var currentParts = current.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
-
-        for (int i = 0; i < Math.Max(latestParts.Length, currentParts.Length); i++)
+        if (int.TryParse(latest, out var latestNum) && int.TryParse(current, out var currentNum))
         {
-            var l = i < latestParts.Length ? latestParts[i] : 0;
-            var c = i < currentParts.Length ? currentParts[i] : 0;
-
-            if (l > c) return true;
-            if (l < c) return false;
+            return latestNum > currentNum;
         }
-
         return false;
     }
 
@@ -105,6 +100,6 @@ public class VersionInfo
     public bool UpdateAvailable { get; set; }
     public string DownloadUrl { get; set; } = "";
     public string? UpdateMessage => UpdateAvailable
-        ? $"A newer version ({LatestVersion}) is available. Download: {DownloadUrl}"
+        ? $"Version {LatestVersion} is available. Download: {DownloadUrl}"
         : null;
 }

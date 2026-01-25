@@ -30,7 +30,7 @@ jobs:
           } else {
             $newMajor = 1
           }
-          $newVersion = "$newMajor.0.0"
+          $newVersion = "$newMajor"
           echo "version=$newVersion" >> $env:GITHUB_OUTPUT
           echo "tag=v$newVersion" >> $env:GITHUB_OUTPUT
           echo "New version: $newVersion"
