@@ -11,6 +11,7 @@ public partial class App : Application
     private ConfigurationService? _configService;
     private LogManager? _logManager;
     private ProcessManager? _processManager;
+    private VersionChecker? _versionChecker;
     private ApiHost? _apiHost;
     private MainViewModel? _viewModel;
 
@@ -57,8 +58,11 @@ public partial class App : Application
         // Detect already-running services
         await _processManager.DetectRunningServicesAsync();
 
+        // Initialize version checker
+        _versionChecker = new VersionChecker();
+
         // Start API host
-        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, _configService);
+        _apiHost = new ApiHost(_configService.Config.ApiPort, _processManager, _logManager, _configService, _versionChecker);
         try
         {
             _apiHost.Start();
@@ -97,6 +101,7 @@ public partial class App : Application
 
         // Clean up without stopping services
         _logManager?.Dispose();
+        _versionChecker?.Dispose();
         _viewModel?.Dispose();
     }
 }

@@ -14,6 +14,7 @@ public class ApiHost : IDisposable
     private readonly ProcessManager _processManager;
     private readonly LogManager _logManager;
     private readonly ConfigurationService _configService;
+    private readonly VersionChecker _versionChecker;
     private readonly string _configPath;
     private WebApplication? _app;
     private Task? _runTask;
@@ -21,12 +22,13 @@ public class ApiHost : IDisposable
 
     public bool IsRunning { get; private set; }
 
-    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService)
+    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService, VersionChecker versionChecker)
     {
         _port = port;
         _processManager = processManager;
         _logManager = logManager;
         _configService = configService;
+        _versionChecker = versionChecker;
         _configPath = configService.ConfigPath;
     }
 
@@ -76,6 +78,7 @@ public class ApiHost : IDisposable
         _app.MapGet("/", async (CancellationToken ct) =>
         {
             await CheckAndApplyConfigChangesAsync(ct);
+            var versionInfo = await _versionChecker.CheckForUpdateAsync();
             var services = _processManager.Services.Values.Select(s => new
             {
                 name = s.Config.Name,
@@ -91,7 +94,10 @@ public class ApiHost : IDisposable
             var manifest = new
             {
                 name = "ServiceHost",
-                version = "1.0.0",
+                version = versionInfo.CurrentVersion,
+                latestVersion = versionInfo.LatestVersion,
+                updateAvailable = versionInfo.UpdateAvailable,
+                updateMessage = versionInfo.UpdateMessage,
                 description = "Service manager with HTTP API for Claude Code",
                 configPath = _configPath,
                 configuration = new
