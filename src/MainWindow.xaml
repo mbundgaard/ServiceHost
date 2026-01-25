@@ -333,7 +333,7 @@
                            FontSize="12"/>
 
                 <TextBlock Grid.Column="1"
-                           Text="v1.0.0"
+                           Text="{Binding VersionText}"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            FontSize="11"
                            VerticalAlignment="Center"/>

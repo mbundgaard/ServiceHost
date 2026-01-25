@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,6 +35,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public int ApiPort => _apiPort;
     public string ConfigPath => _configPath;
     public string WindowTitle { get; }
+    public string VersionText { get; }
     public bool HasSelectedService => SelectedService != null;
 
     public MainViewModel(ProcessManager processManager, LogManager logManager, int apiPort, string configPath, string folderName)
@@ -43,6 +45,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _apiPort = apiPort;
         _configPath = configPath;
         WindowTitle = $"ServiceHost — {folderName}";
+
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText = version != null ? $"v{version.Major}" : "v0";
 
         // Initialize service view models
         foreach (var state in processManager.Services.Values)
