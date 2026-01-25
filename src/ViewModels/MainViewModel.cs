@@ -136,25 +136,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task StartAllAsync()
     {
-        foreach (var service in Services)
-        {
-            if (service.Status != ServiceStatus.Running)
-            {
-                await service.StartAsync();
-            }
-        }
+        var tasks = Services
+            .Where(s => s.Status != ServiceStatus.Running)
+            .Select(s => s.StartAsync())
+            .ToList();
+        await Task.WhenAll(tasks);
     }
 
     [RelayCommand]
     private async Task StopAllAsync()
     {
-        foreach (var service in Services)
-        {
-            if (service.Status != ServiceStatus.Stopped)
-            {
-                await service.StopAsync();
-            }
-        }
+        var tasks = Services
+            .Where(s => s.Status != ServiceStatus.Stopped)
+            .Select(s => s.StopAsync())
+            .ToList();
+        await Task.WhenAll(tasks);
     }
 
     public async Task StartServiceAsync(string name)
