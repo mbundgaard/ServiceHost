@@ -44,7 +44,7 @@ jobs:
 
       - name: Publish
         run: |
-          dotnet publish src/ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.assemblyVersion }} -o publish
+          dotnet publish src/ServiceHost.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.assemblyVersion }} -o publish
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
