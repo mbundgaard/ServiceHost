@@ -89,6 +89,89 @@ public class ConfigurationService
         return false;
     }
 
+    /// <summary>
+    /// Save the current configuration to the JSON file.
+    /// </summary>
+    public async Task SaveAsync()
+    {
+        var json = JsonSerializer.Serialize(Config, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        await File.WriteAllTextAsync(_configPath, json);
+        _lastModified = File.GetLastWriteTimeUtc(_configPath);
+    }
+
+    /// <summary>
+    /// Add a new service to the configuration and save.
+    /// </summary>
+    public async Task<(bool success, string? error)> AddServiceAsync(ServiceConfig service)
+    {
+        if (string.IsNullOrWhiteSpace(service.Name))
+        {
+            return (false, "Service name is required");
+        }
+
+        if (Config.Services.Any(s => s.Name.Equals(service.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return (false, $"Service '{service.Name}' already exists");
+        }
+
+        if (string.IsNullOrWhiteSpace(service.Command))
+        {
+            return (false, "Service command is required");
+        }
+
+        Config.Services.Add(service);
+        await SaveAsync();
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Update an existing service in the configuration and save.
+    /// </summary>
+    public async Task<(bool success, string? error)> UpdateServiceAsync(string name, ServiceConfig updatedService)
+    {
+        var existingIndex = Config.Services.FindIndex(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex < 0)
+        {
+            return (false, $"Service '{name}' not found");
+        }
+
+        if (string.IsNullOrWhiteSpace(updatedService.Command))
+        {
+            return (false, "Service command is required");
+        }
+
+        // If name is being changed, check for conflicts
+        if (!updatedService.Name.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+            Config.Services.Any(s => s.Name.Equals(updatedService.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return (false, $"Service '{updatedService.Name}' already exists");
+        }
+
+        Config.Services[existingIndex] = updatedService;
+        await SaveAsync();
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Remove a service from the configuration and save.
+    /// </summary>
+    public async Task<(bool success, string? error)> RemoveServiceAsync(string name)
+    {
+        var service = Config.Services.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (service == null)
+        {
+            return (false, $"Service '{name}' not found");
+        }
+
+        Config.Services.Remove(service);
+        await SaveAsync();
+        return (true, null);
+    }
+
     public string GetLogDirectory()
     {
         var logDir = Config.LogDirectory;

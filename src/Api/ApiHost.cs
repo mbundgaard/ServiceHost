@@ -96,7 +96,7 @@ public class ApiHost : IDisposable
                 configPath = _configPath,
                 configuration = new
                 {
-                    note = "To add or remove services, edit the config file. Changes are auto-detected on next API request.",
+                    note = "Services can be managed via API (POST/PUT/DELETE /services) or by editing the config file. File changes are auto-detected on next API request.",
                     file = _configPath,
                     format = new
                     {
@@ -120,6 +120,9 @@ public class ApiHost : IDisposable
                 {
                     ["GET /"] = "API description and service status",
                     ["GET /services"] = "List all services",
+                    ["POST /services"] = "Create a new service (JSON body with service config)",
+                    ["PUT /services/{name}"] = "Update an existing service (JSON body with service config)",
+                    ["DELETE /services/{name}"] = "Delete a service (stops if running)",
                     ["GET /services/{name}/logs?tail=N"] = "Get last N lines of logs (default 100)",
                     ["POST /services/logs/clear"] = "Clear logs for all services",
                     ["POST /services/{name}/logs/clear"] = "Clear log for one service",
@@ -137,7 +140,9 @@ public class ApiHost : IDisposable
                     "Start blocks until the port accepts connections, so when it returns the service is ready to use.",
                     "Use ?tail=N on the logs endpoint to limit output and avoid large responses.",
                     "Starting an already-running service returns success immediately (idempotent).",
-                    "Services keep running even when the UI is closed - they persist until explicitly stopped."
+                    "Services keep running even when the UI is closed - they persist until explicitly stopped.",
+                    "Use POST/PUT/DELETE /services to create, update, or delete services via API. Changes are persisted to the config file automatically.",
+                    "When updating a running service (PUT), it will be automatically stopped and restarted with the new configuration."
                 },
                 examples = new Dictionary<string, string>
                 {
@@ -145,7 +150,10 @@ public class ApiHost : IDisposable
                     ["stop_one"] = $"curl -X POST http://localhost:{_port}/services/api/stop",
                     ["start_all"] = $"curl -X POST http://localhost:{_port}/services/start",
                     ["get_logs"] = $"curl http://localhost:{_port}/services/api/logs?tail=50",
-                    ["clear_log"] = $"curl -X POST http://localhost:{_port}/services/api/logs/clear"
+                    ["clear_log"] = $"curl -X POST http://localhost:{_port}/services/api/logs/clear",
+                    ["create_service"] = $"curl -X POST http://localhost:{_port}/services -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"8080\"],\"port\":8080}}'",
+                    ["update_service"] = $"curl -X PUT http://localhost:{_port}/services/myservice -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"9090\"],\"port\":9090}}'",
+                    ["delete_service"] = $"curl -X DELETE http://localhost:{_port}/services/myservice"
                 },
                 services
             };
@@ -170,6 +178,114 @@ public class ApiHost : IDisposable
             });
 
             return Results.Json(new { services }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // POST /services - Create a new service
+        _app.MapPost("/services", async (ServiceConfig service, CancellationToken ct) =>
+        {
+            // Check if service already exists in process manager
+            if (_processManager.HasService(service.Name))
+            {
+                return Results.Json(new { success = false, error = $"Service '{service.Name}' already exists" }, statusCode: 409);
+            }
+
+            // Add to configuration
+            var (success, error) = await _configService.AddServiceAsync(service);
+            if (!success)
+            {
+                return Results.Json(new { success = false, error }, statusCode: 400);
+            }
+
+            // Register with process manager
+            _processManager.RegisterService(service);
+
+            return Results.Json(new
+            {
+                success = true,
+                name = service.Name,
+                message = $"Service '{service.Name}' created successfully"
+            }, statusCode: 201);
+        });
+
+        // PUT /services/{name} - Update an existing service
+        _app.MapPut("/services/{name}", async (string name, ServiceConfig updatedService, CancellationToken ct) =>
+        {
+            if (!_processManager.Services.TryGetValue(name, out var state))
+            {
+                return Results.Json(new { success = false, error = $"Service '{name}' not found" }, statusCode: 404);
+            }
+
+            // If service is running, stop it first
+            var wasRunning = state.Status == ServiceStatus.Running || state.Status == ServiceStatus.Starting;
+            if (wasRunning)
+            {
+                await _processManager.StopServiceAsync(name, ct);
+            }
+
+            // Unregister old service
+            await _processManager.UnregisterServiceAsync(name, ct);
+
+            // Preserve the name if not provided in update
+            if (string.IsNullOrWhiteSpace(updatedService.Name))
+            {
+                updatedService.Name = name;
+            }
+
+            // Update configuration
+            var (success, error) = await _configService.UpdateServiceAsync(name, updatedService);
+            if (!success)
+            {
+                // Re-register the old service on failure
+                var oldConfig = _configService.Config.Services.FirstOrDefault(s => s.Name == name);
+                if (oldConfig != null)
+                {
+                    _processManager.RegisterService(oldConfig);
+                }
+                return Results.Json(new { success = false, error }, statusCode: 400);
+            }
+
+            // Register updated service
+            _processManager.RegisterService(updatedService);
+
+            // Restart if it was running
+            if (wasRunning)
+            {
+                await _processManager.StartServiceAsync(updatedService.Name, ct);
+            }
+
+            return Results.Json(new
+            {
+                success = true,
+                name = updatedService.Name,
+                message = $"Service '{name}' updated successfully",
+                wasRestarted = wasRunning
+            });
+        });
+
+        // DELETE /services/{name} - Delete a service
+        _app.MapDelete("/services/{name}", async (string name, CancellationToken ct) =>
+        {
+            if (!_processManager.HasService(name))
+            {
+                return Results.Json(new { success = false, error = $"Service '{name}' not found" }, statusCode: 404);
+            }
+
+            // Stop and unregister from process manager
+            await _processManager.UnregisterServiceAsync(name, ct);
+
+            // Remove from configuration
+            var (success, error) = await _configService.RemoveServiceAsync(name);
+            if (!success)
+            {
+                return Results.Json(new { success = false, error }, statusCode: 400);
+            }
+
+            return Results.Json(new
+            {
+                success = true,
+                name,
+                message = $"Service '{name}' deleted successfully"
+            });
         });
 
         // GET /services/{name}/logs - Get log content
