@@ -215,39 +215,36 @@ public class ApiHost : IDisposable
                 return Results.Json(new { success = false, error = $"Service '{name}' not found" }, statusCode: 404);
             }
 
-            // If service is running, stop it first
-            var wasRunning = state.Status == ServiceStatus.Running || state.Status == ServiceStatus.Starting;
-            if (wasRunning)
-            {
-                await _processManager.StopServiceAsync(name, ct);
-            }
-
-            // Unregister old service
-            await _processManager.UnregisterServiceAsync(name, ct);
-
             // Preserve the name if not provided in update
             if (string.IsNullOrWhiteSpace(updatedService.Name))
             {
                 updatedService.Name = name;
             }
 
-            // Update configuration
+            // Stop if running, but keep registered
+            var wasRunning = state.Status == ServiceStatus.Running || state.Status == ServiceStatus.Starting;
+            if (wasRunning)
+            {
+                await _processManager.StopServiceAsync(name, ct);
+            }
+
+            // Try config update first (before unregistering)
             var (success, error) = await _configService.UpdateServiceAsync(name, updatedService);
             if (!success)
             {
-                // Re-register the old service on failure
-                var oldConfig = _configService.Config.Services.FirstOrDefault(s => s.Name == name);
-                if (oldConfig != null)
+                // Restart if it was running - service still registered
+                if (wasRunning)
                 {
-                    _processManager.RegisterService(oldConfig);
+                    await _processManager.StartServiceAsync(name, ct);
                 }
                 return Results.Json(new { success = false, error }, statusCode: 400);
             }
 
-            // Register updated service
+            // Config succeeded - now swap the registration
+            await _processManager.UnregisterServiceAsync(name, ct);
             _processManager.RegisterService(updatedService);
 
-            // Restart if it was running
+            // Restart with new config
             if (wasRunning)
             {
                 await _processManager.StartServiceAsync(updatedService.Name, ct);

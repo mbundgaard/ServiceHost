@@ -16,6 +16,8 @@ public class ProcessManager : IDisposable
     public IReadOnlyDictionary<string, ServiceState> Services => _services;
 
     public event Action<string, ServiceStatus>? StatusChanged;
+    public event Action<string, ServiceState>? ServiceAdded;
+    public event Action<string>? ServiceRemoved;
 
     public ProcessManager(LogManager logManager)
     {
@@ -24,11 +26,13 @@ public class ProcessManager : IDisposable
 
     public void RegisterService(ServiceConfig config)
     {
-        _services[config.Name] = new ServiceState(config);
+        var state = new ServiceState(config);
+        _services[config.Name] = state;
         lock (_lockSync)
         {
             _serviceLocks[config.Name] = new SemaphoreSlim(1, 1);
         }
+        ServiceAdded?.Invoke(config.Name, state);
     }
 
     private SemaphoreSlim GetServiceLock(string name)
@@ -56,6 +60,7 @@ public class ProcessManager : IDisposable
                 await StopServiceAsync(name, cancellationToken);
             }
             _services.Remove(name);
+            ServiceRemoved?.Invoke(name);
         }
     }
 

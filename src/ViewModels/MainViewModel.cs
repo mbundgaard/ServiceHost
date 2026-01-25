@@ -54,6 +54,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Subscribe to log updates
         _logManager.LogLineReceived += OnLogLineReceived;
         _processManager.StatusChanged += OnStatusChanged;
+        _processManager.ServiceAdded += OnServiceAdded;
+        _processManager.ServiceRemoved += OnServiceRemoved;
 
         // Timer to refresh UI periodically
         _refreshTimer = new DispatcherTimer
@@ -97,6 +99,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var service = Services.FirstOrDefault(s => s.Name == serviceName);
             service?.RefreshStatus();
             UpdateStatusText();
+        });
+    }
+
+    private void OnServiceAdded(string name, ServiceState state)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            if (!Services.Any(s => s.Name == name))
+            {
+                Services.Add(new ServiceItemViewModel(state, this));
+                UpdateStatusText();
+            }
+        });
+    }
+
+    private void OnServiceRemoved(string name)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            var service = Services.FirstOrDefault(s => s.Name == name);
+            if (service != null)
+            {
+                Services.Remove(service);
+                if (SelectedService == service)
+                    SelectedService = null;
+                UpdateStatusText();
+            }
         });
     }
 
@@ -173,6 +202,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _refreshTimer.Stop();
         _logManager.LogLineReceived -= OnLogLineReceived;
         _processManager.StatusChanged -= OnStatusChanged;
+        _processManager.ServiceAdded -= OnServiceAdded;
+        _processManager.ServiceRemoved -= OnServiceRemoved;
     }
 }
 

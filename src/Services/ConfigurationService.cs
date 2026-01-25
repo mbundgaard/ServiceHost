@@ -8,6 +8,7 @@ public class ConfigurationService
 {
     private const string ConfigFileName = "ServiceHost.json";
     private readonly string _configPath;
+    private readonly SemaphoreSlim _fileLock = new(1, 1);
     private DateTime _lastModified;
 
     public AppConfig Config { get; private set; } = new();
@@ -64,6 +65,7 @@ public class ConfigurationService
             return false;
         }
 
+        await _fileLock.WaitAsync();
         try
         {
             var json = await File.ReadAllTextAsync(_configPath);
@@ -85,6 +87,10 @@ public class ConfigurationService
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load config: {ex.Message}");
         }
+        finally
+        {
+            _fileLock.Release();
+        }
 
         return false;
     }
@@ -94,13 +100,41 @@ public class ConfigurationService
     /// </summary>
     public async Task SaveAsync()
     {
-        var json = JsonSerializer.Serialize(Config, new JsonSerializerOptions
+        await _fileLock.WaitAsync();
+        try
         {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-        await File.WriteAllTextAsync(_configPath, json);
-        _lastModified = File.GetLastWriteTimeUtc(_configPath);
+            var json = JsonSerializer.Serialize(Config, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            await File.WriteAllTextAsync(_configPath, json);
+            _lastModified = File.GetLastWriteTimeUtc(_configPath);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    private static (bool valid, string? error) ValidateServiceName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return (false, "Service name is required");
+
+        // Invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (name.Any(c => invalidChars.Contains(c)))
+            return (false, "Service name contains invalid characters");
+
+        // Windows reserved names
+        var reserved = new[] { "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9" };
+        if (reserved.Contains(name.ToUpperInvariant()))
+            return (false, $"'{name}' is a reserved name");
+
+        return (true, null);
     }
 
     /// <summary>
@@ -108,9 +142,10 @@ public class ConfigurationService
     /// </summary>
     public async Task<(bool success, string? error)> AddServiceAsync(ServiceConfig service)
     {
-        if (string.IsNullOrWhiteSpace(service.Name))
+        var (valid, validationError) = ValidateServiceName(service.Name);
+        if (!valid)
         {
-            return (false, "Service name is required");
+            return (false, validationError);
         }
 
         if (Config.Services.Any(s => s.Name.Equals(service.Name, StringComparison.OrdinalIgnoreCase)))
@@ -137,6 +172,12 @@ public class ConfigurationService
         if (existingIndex < 0)
         {
             return (false, $"Service '{name}' not found");
+        }
+
+        var (valid, validationError) = ValidateServiceName(updatedService.Name);
+        if (!valid)
+        {
+            return (false, validationError);
         }
 
         if (string.IsNullOrWhiteSpace(updatedService.Command))
