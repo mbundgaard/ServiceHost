@@ -99,7 +99,7 @@ public class ApiHost : IDisposable
                 downloadUrl = versionInfo.DownloadUrl,
                 exePath = versionInfo.ExePath,
                 processId = versionInfo.ProcessId,
-                instructions = "To update: 1) Download from downloadUrl to exePath.tmp, 2) POST /shutdown, 3) Wait for processId to exit, 4) Delete exePath, 5) Rename exePath.tmp to exePath, 6) Start exePath"
+                instructions = "To update: 1) Download from downloadUrl to exePath.tmp, 2) POST /shutdown, 3) Wait for processId to exit, 4) Delete exePath, 5) Rename exePath.tmp to exePath, 6) Unblock-File exePath, 7) Start exePath"
             } : null;
 
             var manifest = new
