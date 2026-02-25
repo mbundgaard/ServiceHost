@@ -144,9 +144,22 @@ public class ProcessManager : IDisposable
                 CreateNoWindow = true
             };
 
-            foreach (var arg in state.Config.Args)
+            // When command is cmd /c, join remaining args into a single command string
+            // so that shell environment (e.g. npm's PATH setup) propagates correctly
+            var args = state.Config.Args;
+            if (args.Count >= 2
+                && state.Config.Command.Equals("cmd", StringComparison.OrdinalIgnoreCase)
+                && args[0].Equals("/c", StringComparison.OrdinalIgnoreCase))
             {
-                startInfo.ArgumentList.Add(arg);
+                startInfo.ArgumentList.Add("/c");
+                startInfo.ArgumentList.Add(string.Join(" ", args.Skip(1)));
+            }
+            else
+            {
+                foreach (var arg in args)
+                {
+                    startInfo.ArgumentList.Add(arg);
+                }
             }
 
             if (!string.IsNullOrEmpty(state.Config.WorkingDirectory))

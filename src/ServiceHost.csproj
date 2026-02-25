@@ -9,6 +9,7 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <AssemblyName>ServiceHost</AssemblyName>
     <RootNamespace>ServiceHost</RootNamespace>
+    <Version>9.0.0</Version>
 
     <!-- Single file publish settings -->
     <PublishSingleFile>true</PublishSingleFile>

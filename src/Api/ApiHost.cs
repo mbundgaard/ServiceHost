@@ -115,7 +115,7 @@ public class ApiHost : IDisposable
                     fields = new Dictionary<string, string>
                     {
                         ["name"] = "Unique identifier (required). Used in API paths and log files. Avoid special characters.",
-                        ["command"] = "Executable to run (required). Use 'cmd' with '/c' prefix on Windows for npm/npx.",
+                        ["command"] = "Executable to run (required). Use 'cmd' with args [\"/c\", ...] on Windows for npm/npx — args after /c are auto-joined into a single shell command.",
                         ["args"] = "Array of command-line arguments (optional).",
                         ["workingDirectory"] = "Working directory for the process (optional). Relative to ServiceHost.exe location.",
                         ["port"] = "TCP port to check for readiness (optional). Start blocks until port accepts connections.",
