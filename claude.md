@@ -26,7 +26,6 @@ src/
 │   ├── ConfigurationService.cs  # Loads ServiceHost.json
 │   ├── ProcessManager.cs        # Start/stop/monitor processes
 │   ├── LogManager.cs            # Log file management
-│   ├── ReadinessChecker.cs      # Port/pattern readiness
 │   └── VersionChecker.cs        # GitHub release update checking
 ├── Api/
 │   └── ApiHost.cs          # HTTP API (ASP.NET Core minimal API)
@@ -66,7 +65,6 @@ POST   /shutdown                   → Shutdown application (for updates)
       "command": "dotnet",
       "args": ["run"],
       "workingDirectory": "./api",
-      "port": 5000,
       "url": "http://localhost:5000/health",
       "environment": {}
     }
@@ -78,9 +76,8 @@ Config auto-reloads on change - no restart needed.
 
 ## Key Behaviors
 
-- **Readiness**: Blocks until port accepts connections or pattern matches stdout
+- **Shell Mode**: When command is `cmd` with `/c` as first arg, remaining args are auto-joined into a single command string for correct PATH propagation
 - **Persistence**: Services keep running when UI closes
-- **Detection**: On startup, detects already-running services by checking ports
 - **Logs**: Truncated on start/restart, timestamped, accessible via API
 - **Stop**: Graceful shutdown first, then force kill after timeout
 - **Update Check**: Queries GitHub releases, shows update section in API when new version available
