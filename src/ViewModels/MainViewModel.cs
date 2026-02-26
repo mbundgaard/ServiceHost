@@ -151,6 +151,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void CopyPrompt()
+    {
+        var prompt = $@"There is a ServiceHost API running at http://localhost:{_apiPort}/ that manages local services. GET / returns a JSON manifest with all endpoints, service status, config examples, and tips. Use it to manage services.";
+        Clipboard.SetText(prompt);
+    }
+
+    [RelayCommand]
     private void ClearLog()
     {
         if (SelectedService != null)
@@ -221,9 +228,6 @@ public partial class ServiceItemViewModel : ObservableObject
     private int? _processId;
 
     [ObservableProperty]
-    private int? _port;
-
-    [ObservableProperty]
     private bool _isOperating;
 
     public ServiceItemViewModel(ServiceState state, MainViewModel parent)
@@ -232,7 +236,6 @@ public partial class ServiceItemViewModel : ObservableObject
         _parent = parent;
         _status = state.Status;
         _processId = state.ProcessId;
-        _port = state.Config.Port;
     }
 
     public void RefreshStatus()

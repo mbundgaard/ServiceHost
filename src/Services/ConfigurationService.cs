@@ -236,8 +236,7 @@ public class ConfigurationService
                     Name = "example",
                     Command = "python",
                     Args = new List<string> { "-m", "http.server", "8080" },
-                    WorkingDirectory = ".",
-                    Port = 8080
+                    WorkingDirectory = "."
                 }
             }
         };

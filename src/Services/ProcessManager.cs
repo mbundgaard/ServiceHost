@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Net.Sockets;
 using ServiceHost.Models;
 
 namespace ServiceHost.Services;
@@ -70,44 +69,13 @@ public class ProcessManager : IDisposable
     public bool HasService(string name) => _services.ContainsKey(name);
 
     /// <summary>
-    /// Detect services that are already running by checking if their ports are in use.
-    /// Also loads existing log files.
+    /// Load existing log files for all registered services.
     /// </summary>
-    public async Task DetectRunningServicesAsync()
+    public void LoadExistingLogs()
     {
-        foreach (var (name, state) in _services)
+        foreach (var (name, _) in _services)
         {
-            // Load existing log content
             _logManager.LoadExistingLog(name);
-
-            // Check if port is in use
-            if (state.Config.Port.HasValue)
-            {
-                var isRunning = await IsPortInUseAsync(state.Config.Port.Value);
-                if (isRunning)
-                {
-                    state.Status = ServiceStatus.Running;
-                    state.StartedAt = DateTime.Now; // We don't know actual start time
-                    StatusChanged?.Invoke(name, ServiceStatus.Running);
-                }
-            }
-        }
-    }
-
-    private static async Task<bool> IsPortInUseAsync(int port)
-    {
-        try
-        {
-            using var client = new TcpClient();
-            var connectTask = client.ConnectAsync("127.0.0.1", port);
-            var timeoutTask = Task.Delay(500);
-
-            var completedTask = await Task.WhenAny(connectTask, timeoutTask);
-            return completedTask == connectTask && client.Connected;
-        }
-        catch
-        {
-            return false;
         }
     }
 
@@ -186,18 +154,11 @@ public class ProcessManager : IDisposable
                 process = new Process { StartInfo = startInfo };
                 process.EnableRaisingEvents = true;
 
-                // Set up output capture
-                var checker = new ReadinessChecker(
-                    state.Config.Port,
-                    state.Config.ReadyPattern,
-                    state.Config.StartupTimeoutSeconds);
-
                 process.OutputDataReceived += (s, e) =>
                 {
                     if (e.Data != null)
                     {
                         _logManager.WriteLine(name, e.Data);
-                        checker.CheckLine(e.Data);
                     }
                 };
 
@@ -206,7 +167,6 @@ public class ProcessManager : IDisposable
                     if (e.Data != null)
                     {
                         _logManager.WriteLine(name, $"[stderr] {e.Data}");
-                        checker.CheckLine(e.Data);
                     }
                 };
 
@@ -231,20 +191,6 @@ public class ProcessManager : IDisposable
                 process.BeginErrorReadLine();
 
                 _logManager.WriteLine(name, $"Process started with PID {process.Id}");
-
-                // Wait for readiness
-                var (ready, error) = await checker.WaitForReadyAsync(cancellationToken);
-
-                if (!ready)
-                {
-                    _logManager.WriteLine(name, $"Readiness check failed: {error}");
-                    await KillProcessTreeAsync(process);
-                    state.SetFailed(error ?? "Readiness check failed");
-                    StatusChanged?.Invoke(name, ServiceStatus.Failed);
-                    return (false, error);
-                }
-
-                _logManager.WriteLine(name, "Service is ready");
                 state.SetRunning(process);
                 StatusChanged?.Invoke(name, ServiceStatus.Running);
                 return (true, null);
@@ -329,41 +275,9 @@ public class ProcessManager : IDisposable
                     return (false, error);
                 }
             }
-            else if (state.Config.Port.HasValue)
-            {
-                // No process reference but we know the port - try to find and kill the process
-                var killed = await KillProcessOnPortAsync(state.Config.Port.Value, state.Config.ShutdownTimeoutSeconds);
-                if (killed)
-                {
-                    _logManager.WriteLine(name, "Service stopped (by port)");
-                    state.SetStopped();
-                    StatusChanged?.Invoke(name, ServiceStatus.Stopped);
-                    return (true, null);
-                }
-                else
-                {
-                    // Port might already be free
-                    var isRunning = await IsPortInUseAsync(state.Config.Port.Value);
-                    if (!isRunning)
-                    {
-                        _logManager.WriteLine(name, "Service already stopped");
-                        state.SetStopped();
-                        StatusChanged?.Invoke(name, ServiceStatus.Stopped);
-                        return (true, null);
-                    }
-                    else
-                    {
-                        var error = "Failed to stop process: could not find process to kill";
-                        _logManager.WriteLine(name, error);
-                        state.SetFailed(error);
-                        StatusChanged?.Invoke(name, ServiceStatus.Failed);
-                        return (false, error);
-                    }
-                }
-            }
             else
             {
-                // No process reference and no port - just mark as stopped
+                // No process reference - just mark as stopped
                 state.SetStopped();
                 StatusChanged?.Invoke(name, ServiceStatus.Stopped);
                 return (true, null);
@@ -373,57 +287,6 @@ public class ProcessManager : IDisposable
         {
             serviceLock.Release();
         }
-    }
-
-    private static async Task<bool> KillProcessOnPortAsync(int port, int timeoutSeconds)
-    {
-        try
-        {
-            // Use netstat to find the PID
-            var psi = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/c netstat -ano | findstr \":{port}.*LISTENING\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process == null) return false;
-
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-
-            // Parse the PID from the output
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 5 && int.TryParse(parts[^1].Trim(), out var pid))
-                {
-                    try
-                    {
-                        var targetProcess = Process.GetProcessById(pid);
-                        targetProcess.Kill(entireProcessTree: true);
-
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-                        await targetProcess.WaitForExitAsync(cts.Token);
-                        return true;
-                    }
-                    catch
-                    {
-                        // Process might already be gone
-                    }
-                }
-            }
-        }
-        catch
-        {
-            // Ignore errors
-        }
-
-        return false;
     }
 
     public async Task<(bool success, string? error)> RestartServiceAsync(string name, CancellationToken cancellationToken = default)

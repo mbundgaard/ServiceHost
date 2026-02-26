@@ -55,8 +55,8 @@ public partial class App : Application
             _processManager.RegisterService(serviceConfig);
         }
 
-        // Detect already-running services
-        await _processManager.DetectRunningServicesAsync();
+        // Load existing log files
+        _processManager.LoadExistingLogs();
 
         // Initialize version checker
         _versionChecker = new VersionChecker();

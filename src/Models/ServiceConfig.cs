@@ -28,20 +28,11 @@ public class ServiceConfig
     [JsonPropertyName("workingDirectory")]
     public string? WorkingDirectory { get; set; }
 
-    [JsonPropertyName("port")]
-    public int? Port { get; set; }
-
     [JsonPropertyName("url")]
     public string? Url { get; set; }
 
-    [JsonPropertyName("readyPattern")]
-    public string? ReadyPattern { get; set; }
-
     [JsonPropertyName("environment")]
     public Dictionary<string, string>? Environment { get; set; }
-
-    [JsonPropertyName("startupTimeoutSeconds")]
-    public int StartupTimeoutSeconds { get; set; } = 30;
 
     [JsonPropertyName("shutdownTimeoutSeconds")]
     public int ShutdownTimeoutSeconds { get; set; } = 5;

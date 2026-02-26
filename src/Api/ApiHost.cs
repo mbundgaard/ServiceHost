@@ -55,7 +55,6 @@ public class ApiHost : IDisposable
             if (config != null)
             {
                 _processManager.RegisterService(config);
-                await _processManager.DetectRunningServicesAsync();
             }
         }
 
@@ -84,7 +83,6 @@ public class ApiHost : IDisposable
             {
                 name = s.Config.Name,
                 status = s.Status.ToString().ToLowerInvariant(),
-                port = s.Config.Port,
                 pid = s.ProcessId,
                 command = $"{s.Config.Command} {string.Join(" ", s.Config.Args)}",
                 workingDirectory = s.Config.WorkingDirectory,
@@ -115,13 +113,11 @@ public class ApiHost : IDisposable
                     fields = new Dictionary<string, string>
                     {
                         ["name"] = "Unique identifier (required). Used in API paths and log files. Avoid special characters.",
-                        ["command"] = "Executable to run (required). Use 'cmd' with args [\"/c\", ...] on Windows for npm/npx — args after /c are auto-joined into a single shell command.",
+                        ["command"] = "Executable to run (required). Use 'cmd' with args [\"/c\", ...] on Windows for npm/npx/node scripts.",
                         ["args"] = "Array of command-line arguments (optional).",
                         ["workingDirectory"] = "Working directory for the process (optional). Relative to ServiceHost.exe location.",
-                        ["port"] = "TCP port to check for readiness (optional). Start blocks until port accepts connections.",
                         ["url"] = "URL shown in UI for quick access (optional). E.g., health endpoint or main page.",
                         ["environment"] = "Environment variables as key-value pairs (optional).",
-                        ["startupTimeoutSeconds"] = "Max seconds to wait for readiness (optional, default 30).",
                         ["shutdownTimeoutSeconds"] = "Max seconds for graceful shutdown (optional, default 5)."
                     },
                     examples = new object[]
@@ -135,7 +131,6 @@ public class ApiHost : IDisposable
                                 command = "cmd",
                                 args = new[] { "/c", "npm", "run", "dev" },
                                 workingDirectory = "./app",
-                                port = 5173,
                                 url = "http://localhost:5173"
                             }
                         },
@@ -148,7 +143,6 @@ public class ApiHost : IDisposable
                                 command = "dotnet",
                                 args = new[] { "run" },
                                 workingDirectory = "./api",
-                                port = 5000,
                                 url = "http://localhost:5000/health",
                                 environment = new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
                             }
@@ -161,8 +155,7 @@ public class ApiHost : IDisposable
                                 name = "python-api",
                                 command = "python",
                                 args = new[] { "-m", "uvicorn", "main:app", "--port", "8000" },
-                                workingDirectory = "./backend",
-                                port = 8000
+                                workingDirectory = "./backend"
                             }
                         }
                     }
@@ -189,7 +182,6 @@ public class ApiHost : IDisposable
                 {
                     "Logs are auto-cleared on start/restart. Use clear to remove old entries before testing, so subsequent log fetches show only relevant output.",
                     "Batch operations (start/stop/restart all) run in parallel for faster execution.",
-                    "Start blocks until the port accepts connections, so when it returns the service is ready to use.",
                     "Use ?tail=N on the logs endpoint to limit output and avoid large responses.",
                     "Starting an already-running service returns success immediately (idempotent).",
                     "Services keep running even when the UI is closed - they persist until explicitly stopped.",
@@ -203,8 +195,8 @@ public class ApiHost : IDisposable
                     ["start_all"] = $"curl -X POST http://localhost:{_port}/services/start",
                     ["get_logs"] = $"curl http://localhost:{_port}/services/api/logs?tail=50",
                     ["clear_log"] = $"curl -X POST http://localhost:{_port}/services/api/logs/clear",
-                    ["create_service"] = $"curl -X POST http://localhost:{_port}/services -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"8080\"],\"port\":8080}}'",
-                    ["update_service"] = $"curl -X PUT http://localhost:{_port}/services/myservice -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"9090\"],\"port\":9090}}'",
+                    ["create_service"] = $"curl -X POST http://localhost:{_port}/services -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"8080\"]}}'",
+                    ["update_service"] = $"curl -X PUT http://localhost:{_port}/services/myservice -H \"Content-Type: application/json\" -d '{{\"name\":\"myservice\",\"command\":\"python\",\"args\":[\"-m\",\"http.server\",\"9090\"]}}'",
                     ["delete_service"] = $"curl -X DELETE http://localhost:{_port}/services/myservice"
                 },
                 services
@@ -225,7 +217,6 @@ public class ApiHost : IDisposable
             {
                 name = s.Config.Name,
                 status = s.Status.ToString().ToLowerInvariant(),
-                port = s.Config.Port,
                 pid = s.ProcessId,
                 command = $"{s.Config.Command} {string.Join(" ", s.Config.Args)}",
                 workingDirectory = s.Config.WorkingDirectory,
