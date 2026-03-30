@@ -15,7 +15,6 @@ When AI assistants spawn services directly, processes can linger after the sessi
 - Gives you visibility and control over running services
 - Persists across AI assistant sessions
 - Provides clean start/stop/restart operations
-- Detects already-running services on startup
 
 Typical use cases:
 
@@ -30,7 +29,7 @@ Typical use cases:
 - **WPF UI** - Dark themed interface with service list, controls, and log viewer
 - **HTTP API** - Self-describing REST API on localhost:9500
 - **Process Management** - Start, stop, restart services with stdout/stderr capture
-- **Readiness Detection** - Port-based or pattern-based startup detection
+- **Shell Mode** - cmd /c args are auto-joined for correct npm/npx PATH propagation
 - **Persistent Services** - Services keep running when UI closes
 - **Auto-Reload Config** - Edit `ServiceHost.json` and changes are picked up on next API request
 - **Service CRUD via API** - Create, update, delete services via REST endpoints
@@ -68,17 +67,17 @@ Create `ServiceHost.json` next to the executable:
       "command": "dotnet",
       "args": ["run"],
       "workingDirectory": "./api",
-      "port": 5000,
+      "url": "http://localhost:5000/health",
       "environment": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     {
       "name": "frontend",
-      "command": "npm",
-      "args": ["run", "dev"],
+      "command": "cmd",
+      "args": ["/c", "npm", "run", "dev"],
       "workingDirectory": "./app",
-      "port": 5173
+      "url": "http://localhost:5173"
     }
   ]
 }
@@ -89,14 +88,11 @@ Create `ServiceHost.json` next to the executable:
 | Field | Description |
 |-------|-------------|
 | `name` | Unique service identifier |
-| `command` | Executable to run |
+| `command` | Executable to run. Use `cmd` with `["/c", ...]` args on Windows for npm/npx |
 | `args` | Command-line arguments (array) |
 | `workingDirectory` | Working directory for the process |
-| `port` | TCP port to check for readiness (optional) |
 | `url` | Clickable URL shown in UI (e.g., health endpoint or main page) |
-| `readyPattern` | Regex pattern in stdout indicating readiness (optional) |
 | `environment` | Environment variables (optional) |
-| `startupTimeoutSeconds` | Readiness timeout (default: 30) |
 | `shutdownTimeoutSeconds` | Graceful shutdown timeout (default: 5) |
 
 ## HTTP API
@@ -112,11 +108,11 @@ Returns a self-describing manifest with all endpoints, examples, and current ser
 ```json
 {
   "name": "ServiceHost",
-  "version": "4",
+  "version": "9",
   "description": "Service manager with HTTP API for AI assistants",
   "update": {
-    "currentVersion": "3",
-    "newVersion": "4",
+    "currentVersion": "8",
+    "newVersion": "9",
     "downloadUrl": "https://github.com/mbundgaard/ServiceHost/releases/latest/download/ServiceHost.exe",
     "exePath": "C:/path/to/ServiceHost.exe",
     "processId": 12345,
@@ -164,12 +160,12 @@ curl http://localhost:9500/services/api/logs?tail=50
 # Create a new service
 curl -X POST http://localhost:9500/services \
   -H "Content-Type: application/json" \
-  -d '{"name":"worker","command":"node","args":["worker.js"],"port":3001}'
+  -d '{"name":"worker","command":"node","args":["worker.js"]}'
 
 # Update a service
 curl -X PUT http://localhost:9500/services/worker \
   -H "Content-Type: application/json" \
-  -d '{"name":"worker","command":"node","args":["worker-v2.js"],"port":3001}'
+  -d '{"name":"worker","command":"node","args":["worker-v2.js"]}'
 
 # Delete a service
 curl -X DELETE http://localhost:9500/services/worker
@@ -185,7 +181,7 @@ curl -X POST http://localhost:9500/shutdown
 { "success": true, "name": "api", "status": "running", "pid": 12345 }
 
 // Failure
-{ "success": false, "name": "api", "error": "Timeout waiting for port 5000" }
+{ "success": false, "name": "api", "error": "Failed to start process" }
 ```
 
 ## UI

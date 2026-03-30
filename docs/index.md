@@ -28,7 +28,6 @@ Returns full API schema, available endpoints, service status, and configuration 
 ## What It Does
 
 - Manages background services (start/stop/restart via API)
-- Monitors readiness via port or stdout patterns
 - Serves logs via API
 - Config auto-reloads on change (no restart needed)
 - Services persist when UI closes
@@ -46,8 +45,7 @@ Create `ServiceHost.json` next to the executable:
       "name": "my-api",
       "command": "dotnet",
       "args": ["run"],
-      "workingDirectory": "./my-api",
-      "port": 5000
+      "workingDirectory": "./my-api"
     }
   ]
 }

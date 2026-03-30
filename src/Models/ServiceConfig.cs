@@ -28,6 +28,9 @@ public class ServiceConfig
     [JsonPropertyName("workingDirectory")]
     public string? WorkingDirectory { get; set; }
 
+    [JsonPropertyName("port")]
+    public int? Port { get; set; }
+
     [JsonPropertyName("url")]
     public string? Url { get; set; }
 

@@ -99,6 +99,18 @@ public class ProcessManager : IDisposable
             state.Status = ServiceStatus.Starting;
             StatusChanged?.Invoke(name, ServiceStatus.Starting);
 
+            // Kill any process occupying the configured port
+            if (state.Config.Port.HasValue)
+            {
+                var portClearResult = await ClearPortAsync(name, state.Config.Port.Value);
+                if (!portClearResult.success)
+                {
+                    state.SetFailed(portClearResult.error!);
+                    StatusChanged?.Invoke(name, ServiceStatus.Failed);
+                    return (false, portClearResult.error);
+                }
+            }
+
             // Reset log file
             _logManager.ResetLog(name);
             _logManager.WriteLine(name, $"Starting service: {state.Config.Command} {string.Join(" ", state.Config.Args)}");
@@ -298,6 +310,76 @@ public class ProcessManager : IDisposable
         }
 
         return await StartServiceAsync(name, cancellationToken);
+    }
+
+    private async Task<(bool success, string? error)> ClearPortAsync(string serviceName, int port)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                ArgumentList = { "-ano" },
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+
+            var netstat = Process.Start(psi);
+            if (netstat == null)
+            {
+                return (false, "Failed to run netstat");
+            }
+
+            var output = await netstat.StandardOutput.ReadToEndAsync();
+            await netstat.WaitForExitAsync();
+
+            var pids = new HashSet<int>();
+            var portSuffix = $":{port}";
+            foreach (var line in output.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.Contains("LISTENING")) continue;
+
+                // netstat -ano format: proto  local_addr  foreign_addr  state  pid
+                var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5) continue;
+
+                var localAddr = parts[1];
+                if (!localAddr.EndsWith(portSuffix)) continue;
+
+                if (int.TryParse(parts[^1], out var pid) && pid > 0)
+                {
+                    pids.Add(pid);
+                }
+            }
+
+            if (pids.Count == 0) return (true, null);
+
+            foreach (var pid in pids)
+            {
+                try
+                {
+                    var proc = Process.GetProcessById(pid);
+                    _logManager.WriteLine(serviceName, $"Killing process {proc.ProcessName} (PID {pid}) on port {port}");
+                    await KillProcessTreeAsync(proc);
+                }
+                catch (ArgumentException)
+                {
+                    // Process already exited
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"Failed to kill process on port {port} (PID {pid}): {ex.Message}");
+                }
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Failed to check port {port}: {ex.Message}");
+        }
     }
 
     private static async Task KillProcessTreeAsync(Process process)
