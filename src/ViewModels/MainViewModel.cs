@@ -104,6 +104,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var service = Services.FirstOrDefault(s => s.Name == serviceName);
             service?.RefreshStatus();
             UpdateStatusText();
+
+            // Switch focus to the service being operated on
+            if (service != null && (status == ServiceStatus.Starting || status == ServiceStatus.Stopping))
+            {
+                SelectedService = service;
+            }
         });
     }
 

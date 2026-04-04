@@ -158,6 +158,11 @@ public class ConfigurationService
             return (false, "Service command is required");
         }
 
+        if (service.Port <= 0)
+        {
+            return (false, "Service port is required");
+        }
+
         Config.Services.Add(service);
         await SaveAsync();
         return (true, null);
@@ -183,6 +188,11 @@ public class ConfigurationService
         if (string.IsNullOrWhiteSpace(updatedService.Command))
         {
             return (false, "Service command is required");
+        }
+
+        if (updatedService.Port <= 0)
+        {
+            return (false, "Service port is required");
         }
 
         // If name is being changed, check for conflicts
@@ -236,7 +246,8 @@ public class ConfigurationService
                     Name = "example",
                     Command = "python",
                     Args = new List<string> { "-m", "http.server", "8080" },
-                    WorkingDirectory = "."
+                    WorkingDirectory = ".",
+                    Port = 8080
                 }
             }
         };

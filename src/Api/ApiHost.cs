@@ -109,16 +109,16 @@ public class ApiHost : IDisposable
                 configPath = _configPath,
                 addingServices = new
                 {
-                    instructions = "POST to /services with a JSON body. Required: name, command. The service starts automatically after creation if you call the start endpoint.",
+                    instructions = "POST to /services with a JSON body. Required: name, command, port. The service starts automatically after creation if you call the start endpoint.",
                     fields = new Dictionary<string, string>
                     {
                         ["name"] = "Unique identifier (required). Used in API paths and log files. Avoid special characters.",
                         ["command"] = "Executable to run (required). Use 'cmd' with args [\"/c\", ...] on Windows for npm/npx/node scripts.",
                         ["args"] = "Array of command-line arguments (optional).",
                         ["workingDirectory"] = "Working directory for the process (optional). Relative to ServiceHost.exe location.",
+                        ["port"] = "Port the service binds to (required). Identifies the process — used to adopt running instances on startup and kill conflicting processes before start.",
                         ["url"] = "URL shown in UI for quick access (optional). E.g., health endpoint or main page.",
-                        ["environment"] = "Environment variables as key-value pairs (optional).",
-                        ["shutdownTimeoutSeconds"] = "Max seconds for graceful shutdown (optional, default 5)."
+                        ["environment"] = "Environment variables as key-value pairs (optional)."
                     },
                     examples = new object[]
                     {
@@ -131,6 +131,7 @@ public class ApiHost : IDisposable
                                 command = "cmd",
                                 args = new[] { "/c", "npm", "run", "dev" },
                                 workingDirectory = "./app",
+                                port = 5173,
                                 url = "http://localhost:5173"
                             }
                         },
@@ -143,6 +144,7 @@ public class ApiHost : IDisposable
                                 command = "dotnet",
                                 args = new[] { "run" },
                                 workingDirectory = "./api",
+                                port = 5000,
                                 url = "http://localhost:5000/health",
                                 environment = new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
                             }
@@ -155,7 +157,8 @@ public class ApiHost : IDisposable
                                 name = "python-api",
                                 command = "python",
                                 args = new[] { "-m", "uvicorn", "main:app", "--port", "8000" },
-                                workingDirectory = "./backend"
+                                workingDirectory = "./backend",
+                                port = 8000
                             }
                         }
                     }

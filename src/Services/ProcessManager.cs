@@ -31,7 +31,48 @@ public class ProcessManager : IDisposable
         {
             _serviceLocks[config.Name] = new SemaphoreSlim(1, 1);
         }
+
+        // Try to adopt an existing process on the configured port
+        if (config.Port > 0)
+        {
+            TryAdoptExistingProcess(state, config.Port);
+        }
+
         ServiceAdded?.Invoke(config.Name, state);
+    }
+
+    /// <summary>
+    /// If a process is already listening on the configured port, adopt it as our own.
+    /// </summary>
+    private void TryAdoptExistingProcess(ServiceState state, int port)
+    {
+        try
+        {
+            var pids = FindPidsOnPort(port);
+            if (pids.Count == 0) return;
+
+            var pid = pids.First();
+            var process = Process.GetProcessById(pid);
+            _logManager.WriteLine(state.Config.Name, $"Adopted existing process {process.ProcessName} (PID {pid}) on port {port}");
+
+            process.EnableRaisingEvents = true;
+            process.Exited += (s, e) =>
+            {
+                _logManager.WriteLine(state.Config.Name, $"Process exited with code {process.ExitCode}");
+                if (state.Status == ServiceStatus.Running)
+                {
+                    state.SetFailed($"Process exited unexpectedly with code {process.ExitCode}");
+                    StatusChanged?.Invoke(state.Config.Name, ServiceStatus.Failed);
+                }
+            };
+
+            state.SetRunning(process);
+            StatusChanged?.Invoke(state.Config.Name, ServiceStatus.Running);
+        }
+        catch (Exception ex)
+        {
+            _logManager.WriteLine(state.Config.Name, $"Failed to adopt process on port {port}: {ex.Message}");
+        }
     }
 
     private SemaphoreSlim GetServiceLock(string name)
@@ -100,9 +141,9 @@ public class ProcessManager : IDisposable
             StatusChanged?.Invoke(name, ServiceStatus.Starting);
 
             // Kill any process occupying the configured port
-            if (state.Config.Port.HasValue)
+            if (state.Config.Port > 0)
             {
-                var portClearResult = await ClearPortAsync(name, state.Config.Port.Value);
+                var portClearResult = await ClearPortAsync(name, state.Config.Port);
                 if (!portClearResult.success)
                 {
                     state.SetFailed(portClearResult.error!);
@@ -242,41 +283,11 @@ public class ProcessManager : IDisposable
             StatusChanged?.Invoke(name, ServiceStatus.Stopping);
             _logManager.WriteLine(name, "Stopping service...");
 
-            // If we have a process reference, use it
-            if (state.Process != null)
+            if (state.Process != null && !state.Process.HasExited)
             {
-                var process = state.Process;
-                var timeout = TimeSpan.FromSeconds(state.Config.ShutdownTimeoutSeconds);
-
                 try
                 {
-                    // Try graceful shutdown first
-                    if (!process.HasExited)
-                    {
-                        process.CloseMainWindow();
-
-                        using var cts = new CancellationTokenSource(timeout);
-                        try
-                        {
-                            await process.WaitForExitAsync(cts.Token);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // Graceful shutdown timed out, force kill
-                            _logManager.WriteLine(name, "Graceful shutdown timed out, force killing...");
-                        }
-                    }
-
-                    // Force kill if still running
-                    if (!process.HasExited)
-                    {
-                        await KillProcessTreeAsync(process);
-                    }
-
-                    _logManager.WriteLine(name, "Service stopped");
-                    state.SetStopped();
-                    StatusChanged?.Invoke(name, ServiceStatus.Stopped);
-                    return (true, null);
+                    await KillProcessTreeAsync(state.Process);
                 }
                 catch (Exception ex)
                 {
@@ -287,13 +298,11 @@ public class ProcessManager : IDisposable
                     return (false, error);
                 }
             }
-            else
-            {
-                // No process reference - just mark as stopped
-                state.SetStopped();
-                StatusChanged?.Invoke(name, ServiceStatus.Stopped);
-                return (true, null);
-            }
+
+            _logManager.WriteLine(name, "Service stopped");
+            state.SetStopped();
+            StatusChanged?.Invoke(name, ServiceStatus.Stopped);
+            return (true, null);
         }
         finally
         {
@@ -312,48 +321,53 @@ public class ProcessManager : IDisposable
         return await StartServiceAsync(name, cancellationToken);
     }
 
+    /// <summary>
+    /// Synchronously find PIDs listening on a given port via netstat.
+    /// </summary>
+    private static HashSet<int> FindPidsOnPort(int port)
+    {
+        var pids = new HashSet<int>();
+        var psi = new ProcessStartInfo
+        {
+            FileName = "netstat",
+            ArgumentList = { "-ano" },
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true
+        };
+
+        var netstat = Process.Start(psi);
+        if (netstat == null) return pids;
+
+        var output = netstat.StandardOutput.ReadToEnd();
+        netstat.WaitForExit();
+
+        var portSuffix = $":{port}";
+        foreach (var line in output.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (!trimmed.Contains("LISTENING")) continue;
+
+            var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 5) continue;
+
+            var localAddr = parts[1];
+            if (!localAddr.EndsWith(portSuffix)) continue;
+
+            if (int.TryParse(parts[^1], out var pid) && pid > 0)
+            {
+                pids.Add(pid);
+            }
+        }
+
+        return pids;
+    }
+
     private async Task<(bool success, string? error)> ClearPortAsync(string serviceName, int port)
     {
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "netstat",
-                ArgumentList = { "-ano" },
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            };
-
-            var netstat = Process.Start(psi);
-            if (netstat == null)
-            {
-                return (false, "Failed to run netstat");
-            }
-
-            var output = await netstat.StandardOutput.ReadToEndAsync();
-            await netstat.WaitForExitAsync();
-
-            var pids = new HashSet<int>();
-            var portSuffix = $":{port}";
-            foreach (var line in output.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (!trimmed.Contains("LISTENING")) continue;
-
-                // netstat -ano format: proto  local_addr  foreign_addr  state  pid
-                var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 5) continue;
-
-                var localAddr = parts[1];
-                if (!localAddr.EndsWith(portSuffix)) continue;
-
-                if (int.TryParse(parts[^1], out var pid) && pid > 0)
-                {
-                    pids.Add(pid);
-                }
-            }
-
+            var pids = FindPidsOnPort(port);
             if (pids.Count == 0) return (true, null);
 
             foreach (var pid in pids)

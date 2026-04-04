@@ -17,31 +17,41 @@ public partial class App : Application
 
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
+        // Catch unhandled exceptions to prevent silent crashes
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            var ex = args.ExceptionObject as Exception;
+            var msg = $"[UNHANDLED] {ex?.GetType().Name}: {ex?.Message}\n{ex?.StackTrace}";
+            System.Diagnostics.Debug.WriteLine(msg);
+            try { _logManager?.WriteLine("_crash", msg); } catch { }
+            MessageBox.Show(msg, "Unhandled Exception", MessageBoxButton.OK, MessageBoxImage.Error);
+        };
+
+        DispatcherUnhandledException += (s, args) =>
+        {
+            var msg = $"[DISPATCHER] {args.Exception.GetType().Name}: {args.Exception.Message}\n{args.Exception.StackTrace}";
+            System.Diagnostics.Debug.WriteLine(msg);
+            try { _logManager?.WriteLine("_crash", msg); } catch { }
+            MessageBox.Show(msg, "Dispatcher Exception", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
+        TaskScheduler.UnobservedTaskException += (s, args) =>
+        {
+            var msg = $"[TASK] {args.Exception.GetType().Name}: {args.Exception.Message}\n{args.Exception.StackTrace}";
+            System.Diagnostics.Debug.WriteLine(msg);
+            try { _logManager?.WriteLine("_crash", msg); } catch { }
+            args.SetObserved();
+        };
+
         // Load configuration
         _configService = new ConfigurationService();
         var loaded = await _configService.LoadAsync();
 
         if (!loaded)
         {
-            var result = MessageBox.Show(
-                "ServiceHost.json not found.\n\nWould you like to create an example configuration file?",
-                "Configuration Not Found",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                var examplePath = Path.Combine(AppContext.BaseDirectory, "ServiceHost.json");
-                await ConfigurationService.SaveExampleConfigAsync(examplePath);
-                MessageBox.Show(
-                    $"Example configuration created at:\n{examplePath}\n\nPlease edit the file and restart the application.",
-                    "Configuration Created",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-
-            Shutdown();
-            return;
+            await ConfigurationService.SaveExampleConfigAsync(_configService.ConfigPath);
+            await _configService.LoadAsync();
         }
 
         // Initialize services

@@ -277,7 +277,7 @@
                                 </Button>
                                 <CheckBox x:Name="WordWrapCheckBox"
                                           Content="Wrap"
-                                          IsChecked="True"
+                                          IsChecked="False"
                                           Foreground="{StaticResource TextSecondaryBrush}"
                                           VerticalAlignment="Center"
                                           FontSize="11"/>
@@ -296,7 +296,7 @@
                              BorderThickness="0"
                              Padding="16,12"
                              VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled"
                              x:Name="LogTextBox">
                         <TextBox.Style>
                             <Style TargetType="TextBox">
