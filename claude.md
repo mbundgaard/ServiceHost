@@ -13,11 +13,15 @@ Windows WPF application that manages services with an HTTP API for AI assistants
 .\publish.ps1  # Create publish/ServiceHost.exe
 ```
 
+## Releases
+
+Automated via GitHub Actions. Every push to `master` triggers `.github/workflows/release.yml` which auto-increments the version from git tags, publishes a single-file exe, and creates a GitHub release.
+
 ## Project Structure
 
 ```
 src/
-├── App.xaml(.cs)           # Application startup, dependency wiring
+├── App.xaml(.cs)           # Application startup, dependency wiring, crash handlers
 ├── MainWindow.xaml(.cs)    # WPF UI, dark theme
 ├── Models/
 │   ├── ServiceConfig.cs    # JSON config model
@@ -55,6 +59,8 @@ POST   /shutdown                   → Shutdown application (for updates)
 
 ## Configuration (ServiceHost.json)
 
+Auto-created with example on first run. Auto-reloads on change — no restart needed.
+
 ```json
 {
   "apiPort": 9500,
@@ -65,6 +71,7 @@ POST   /shutdown                   → Shutdown application (for updates)
       "command": "dotnet",
       "args": ["run"],
       "workingDirectory": "./api",
+      "port": 5000,
       "url": "http://localhost:5000/health",
       "environment": {}
     }
@@ -72,14 +79,17 @@ POST   /shutdown                   → Shutdown application (for updates)
 }
 ```
 
-Config auto-reloads on change - no restart needed.
+Required fields: `name`, `command`, `port`.
 
 ## Key Behaviors
 
+- **Port**: Required. Identifies the process bound to the port — used to adopt running instances on startup and kill conflicting processes before start
 - **Shell Mode**: When command is `cmd` with `/c` as first arg, remaining args are auto-joined into a single command string for correct PATH propagation
+- **Process Adoption**: On startup, services with a port already in use are adopted as running (no orphaned processes)
 - **Persistence**: Services keep running when UI closes
+- **Stop**: Kills the entire process tree directly
 - **Logs**: Truncated on start/restart, timestamped, accessible via API
-- **Stop**: Graceful shutdown first, then force kill after timeout
 - **Update Check**: Queries GitHub releases, shows update section in API when new version available
 - **File Locking**: Config file access is serialized to prevent corruption
 - **Name Validation**: Service names validated against invalid filename chars and Windows reserved names
+- **Crash Handling**: Unhandled exceptions are caught, logged to `_crash`, and shown in a dialog

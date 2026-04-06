@@ -16,6 +16,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly int _apiPort;
     private readonly string _configPath;
     private readonly DispatcherTimer _refreshTimer;
+    private readonly object _pendingLogLock = new();
+    private readonly System.Text.StringBuilder _pendingLogLines = new();
+    private volatile bool _hasPendingLogLines;
 
     [ObservableProperty]
     private ObservableCollection<ServiceItemViewModel> _services = new();
@@ -25,6 +28,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _logContent = string.Empty;
+
+    [ObservableProperty]
+    private bool _isLogPaused;
+
+    partial void OnIsLogPausedChanged(bool value)
+    {
+        if (!value && SelectedService != null)
+        {
+            // Catch up: reload full log and discard pending buffer
+            lock (_pendingLogLock)
+            {
+                _pendingLogLines.Clear();
+                _hasPendingLogLines = false;
+            }
+            LogContent = _logManager.GetLogContent(SelectedService.Name);
+        }
+    }
 
     [ObservableProperty]
     private string _statusText = "0/0 services running";
@@ -65,7 +85,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Timer to refresh UI periodically
         _refreshTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(200)
         };
         _refreshTimer.Tick += (s, e) => RefreshUI();
         _refreshTimer.Start();
@@ -75,6 +95,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedServiceChanged(ServiceItemViewModel? value)
     {
+        // Discard any pending lines from the previous service
+        lock (_pendingLogLock)
+        {
+            _pendingLogLines.Clear();
+            _hasPendingLogLines = false;
+        }
+
         if (value != null)
         {
             LogContent = _logManager.GetLogContent(value.Name);
@@ -88,13 +115,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnLogLineReceived(string serviceName, string line)
     {
-        Application.Current?.Dispatcher.Invoke(() =>
+        if (SelectedService?.Name != serviceName) return;
+
+        lock (_pendingLogLock)
         {
-            if (SelectedService?.Name == serviceName)
-            {
-                LogContent = _logManager.GetLogContent(serviceName);
-            }
-        });
+            _pendingLogLines.AppendLine(line);
+            _hasPendingLogLines = true;
+        }
     }
 
     private void OnStatusChanged(string serviceName, ServiceStatus status)
@@ -147,6 +174,35 @@ public partial class MainViewModel : ObservableObject, IDisposable
             service.RefreshStatus();
         }
         UpdateStatusText();
+        FlushPendingLogLines();
+    }
+
+    private void FlushPendingLogLines()
+    {
+        if (!_hasPendingLogLines || IsLogPaused) return;
+
+        string newLines;
+        lock (_pendingLogLock)
+        {
+            newLines = _pendingLogLines.ToString();
+            _pendingLogLines.Clear();
+            _hasPendingLogLines = false;
+        }
+
+        if (newLines.Length > 0)
+        {
+            var combined = LogContent + newLines;
+
+            // Keep only the tail (~500KB) to prevent the TextBox from getting too large
+            if (combined.Length > 500_000)
+            {
+                var startIndex = combined.IndexOf('\n', combined.Length - 500_000);
+                if (startIndex >= 0)
+                    combined = combined.Substring(startIndex + 1);
+            }
+
+            LogContent = combined;
+        }
     }
 
     private void UpdateStatusText()
@@ -169,6 +225,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (SelectedService != null)
         {
             _logManager.ResetLog(SelectedService.Name);
+            lock (_pendingLogLock)
+            {
+                _pendingLogLines.Clear();
+                _hasPendingLogLines = false;
+            }
             LogContent = string.Empty;
         }
     }

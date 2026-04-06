@@ -275,6 +275,24 @@
                                         Visibility="{Binding HasSelectedService, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="&#128465;" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 </Button>
+                                <CheckBox x:Name="PauseLogCheckBox"
+                                          IsChecked="{Binding IsLogPaused}"
+                                          Foreground="{StaticResource TextSecondaryBrush}"
+                                          VerticalAlignment="Center"
+                                          FontSize="11"
+                                          Margin="0,0,8,0"
+                                          Visibility="{Binding HasSelectedService, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox">
+                                            <Setter Property="Content" Value="Pause"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLogPaused}" Value="True">
+                                                    <Setter Property="Content" Value="Paused"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
                                 <CheckBox x:Name="WordWrapCheckBox"
                                           Content="Wrap"
                                           IsChecked="False"
