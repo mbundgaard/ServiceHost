@@ -11,6 +11,12 @@ namespace ServiceHost;
 
 public partial class MainWindow : Window
 {
+    private const int MaxLogChars = 500_000;
+    private const int TrimChunk = 50_000;
+
+    private MainViewModel? _viewModel;
+    private int _logLength;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -20,6 +26,52 @@ public partial class MainWindow : Window
         {
             LogTextBox.ScrollToEnd();
         };
+
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (_viewModel != null)
+        {
+            _viewModel.LogReset -= OnLogReset;
+            _viewModel.LogAppended -= OnLogAppended;
+        }
+
+        _viewModel = e.NewValue as MainViewModel;
+
+        if (_viewModel != null)
+        {
+            _viewModel.LogReset += OnLogReset;
+            _viewModel.LogAppended += OnLogAppended;
+        }
+    }
+
+    private void OnLogReset(string content)
+    {
+        LogTextBox.Text = content;
+        _logLength = content.Length;
+    }
+
+    private void OnLogAppended(string newLines)
+    {
+        LogTextBox.AppendText(newLines);
+        _logLength += newLines.Length;
+
+        // Trim from the front when we exceed MaxLogChars by at least TrimChunk,
+        // so we don't pay the full-text rebuild cost on every flush.
+        if (_logLength > MaxLogChars + TrimChunk)
+        {
+            var fullText = LogTextBox.Text;
+            var target = fullText.Length - MaxLogChars;
+            var idx = fullText.IndexOf('\n', target);
+            if (idx > 0)
+            {
+                var trimmed = fullText.Substring(idx + 1);
+                LogTextBox.Text = trimmed;
+                _logLength = trimmed.Length;
+            }
+        }
     }
 
     private void ConfigPath_Click(object sender, MouseButtonEventArgs e)

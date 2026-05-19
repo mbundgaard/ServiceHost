@@ -27,10 +27,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private ServiceItemViewModel? _selectedService;
 
     [ObservableProperty]
-    private string _logContent = string.Empty;
-
-    [ObservableProperty]
     private bool _isLogPaused;
+
+    /// <summary>
+    /// Fired when the entire log view should be replaced (selection change, clear, unpause).
+    /// </summary>
+    public event Action<string>? LogReset;
+
+    /// <summary>
+    /// Fired when new log lines should be appended to the current view.
+    /// </summary>
+    public event Action<string>? LogAppended;
 
     partial void OnIsLogPausedChanged(bool value)
     {
@@ -42,7 +49,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 _pendingLogLines.Clear();
                 _hasPendingLogLines = false;
             }
-            LogContent = _logManager.GetLogContent(SelectedService.Name);
+            LogReset?.Invoke(_logManager.GetLogContent(SelectedService.Name));
         }
     }
 
@@ -102,14 +109,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _hasPendingLogLines = false;
         }
 
-        if (value != null)
-        {
-            LogContent = _logManager.GetLogContent(value.Name);
-        }
-        else
-        {
-            LogContent = string.Empty;
-        }
+        var content = value != null ? _logManager.GetLogContent(value.Name) : string.Empty;
+        LogReset?.Invoke(content);
         OnPropertyChanged(nameof(HasSelectedService));
     }
 
@@ -191,17 +192,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (newLines.Length > 0)
         {
-            var combined = LogContent + newLines;
-
-            // Keep only the tail (~500KB) to prevent the TextBox from getting too large
-            if (combined.Length > 500_000)
-            {
-                var startIndex = combined.IndexOf('\n', combined.Length - 500_000);
-                if (startIndex >= 0)
-                    combined = combined.Substring(startIndex + 1);
-            }
-
-            LogContent = combined;
+            LogAppended?.Invoke(newLines);
         }
     }
 
@@ -230,7 +221,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 _pendingLogLines.Clear();
                 _hasPendingLogLines = false;
             }
-            LogContent = string.Empty;
+            LogReset?.Invoke(string.Empty);
         }
     }
 

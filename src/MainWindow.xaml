@@ -304,8 +304,9 @@
                     </Border>
 
                     <!-- Log Content -->
+                    <!-- Text is driven imperatively from MainWindow code-behind via MainViewModel events
+                         to avoid full-string replacement on every flush; AppendText is much cheaper. -->
                     <TextBox Grid.Row="1"
-                             Text="{Binding LogContent, Mode=OneWay}"
                              IsReadOnly="True"
                              FontFamily="Cascadia Mono, Consolas, monospace"
                              FontSize="12"
