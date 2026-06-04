@@ -14,7 +14,6 @@ public class ApiHost : IDisposable
     private readonly ProcessManager _processManager;
     private readonly LogManager _logManager;
     private readonly ConfigurationService _configService;
-    private readonly VersionChecker _versionChecker;
     private readonly string _configPath;
     private WebApplication? _app;
     private Task? _runTask;
@@ -23,13 +22,12 @@ public class ApiHost : IDisposable
     public bool IsRunning { get; private set; }
     public event Action? ShutdownRequested;
 
-    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService, VersionChecker versionChecker)
+    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService)
     {
         _port = port;
         _processManager = processManager;
         _logManager = logManager;
         _configService = configService;
-        _versionChecker = versionChecker;
         _configPath = configService.ConfigPath;
     }
 
@@ -78,7 +76,6 @@ public class ApiHost : IDisposable
         _app.MapGet("/", async (CancellationToken ct) =>
         {
             await CheckAndApplyConfigChangesAsync(ct);
-            var versionInfo = await _versionChecker.CheckForUpdateAsync();
             var services = _processManager.Services.Values.Select(s => new
             {
                 name = s.Config.Name,
@@ -90,21 +87,10 @@ public class ApiHost : IDisposable
                 error = s.LastError
             });
 
-            object? update = versionInfo.UpdateAvailable ? new
-            {
-                currentVersion = versionInfo.CurrentVersion,
-                newVersion = versionInfo.LatestVersion,
-                downloadUrl = versionInfo.DownloadUrl,
-                exePath = versionInfo.ExePath,
-                processId = versionInfo.ProcessId,
-                instructions = "To update: 1) Download from downloadUrl to exePath.tmp, 2) POST /shutdown, 3) Wait for processId to exit, 4) Delete exePath, 5) Rename exePath.tmp to exePath, 6) Unblock-File exePath, 7) Start exePath"
-            } : null;
-
             var manifest = new
             {
                 name = "ServiceHost",
-                version = versionInfo.CurrentVersion,
-                update,
+                version = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.Major ?? 0}",
                 description = "Service manager with HTTP API for AI assistants",
                 configPath = _configPath,
                 addingServices = new
@@ -179,7 +165,7 @@ public class ApiHost : IDisposable
                     ["POST /services/{name}/start"] = "Start a service (blocks until ready)",
                     ["POST /services/{name}/stop"] = "Stop a service (blocks until stopped)",
                     ["POST /services/{name}/restart"] = "Restart a service",
-                    ["POST /shutdown"] = "Shutdown the application (for updates)"
+                    ["POST /shutdown"] = "Shutdown the application"
                 },
                 tips = new[]
                 {

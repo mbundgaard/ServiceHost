@@ -40,7 +40,7 @@ src/
 ## HTTP API (localhost:9500)
 
 ```
-GET    /                           → API manifest + service status + update info
+GET    /                           → API manifest + service status
 GET    /services                   → List services
 POST   /services                   → Create service (JSON body)
 PUT    /services/{name}            → Update service (JSON body)
@@ -54,7 +54,7 @@ POST   /services/restart           → Restart all (parallel)
 POST   /services/{name}/start      → Start one
 POST   /services/{name}/stop       → Stop one
 POST   /services/{name}/restart    → Restart one
-POST   /shutdown                   → Shutdown application (for updates)
+POST   /shutdown                   → Shutdown application
 ```
 
 ## Configuration (ServiceHost.json)
@@ -89,7 +89,7 @@ Required fields: `name`, `command`, `port`.
 - **Persistence**: Services keep running when UI closes
 - **Stop**: Kills the entire process tree directly
 - **Logs**: Truncated on start/restart, timestamped, accessible via API
-- **Update Check**: Queries GitHub releases, shows update section in API when new version available
+- **Self-Update**: Polls GitHub releases hourly and downloads new builds to `%TEMP%` in the background. The status-bar version label becomes a clickable nudge to install + restart; any pending download is auto-applied on next startup. Child services persist and are re-adopted across the restart
 - **File Locking**: Config file access is serialized to prevent corruption
 - **Name Validation**: Service names validated against invalid filename chars and Windows reserved names
 - **Crash Handling**: Unhandled exceptions are caught, logged to `_crash`, and shown in a dialog

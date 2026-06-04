@@ -59,10 +59,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isApiRunning;
 
+    [ObservableProperty]
+    private string _versionText = "v0";
+
+    /// <summary>True once an update is available or ready — drives the hand cursor + accent color
+    /// on the status-bar version label, and enables its click.</summary>
+    [ObservableProperty]
+    private bool _updateClickable;
+
+    private const string GitHubRepo = "mbundgaard/ServiceHost";
+    private static readonly TimeSpan UpdatePollInterval = TimeSpan.FromHours(1);
+    private readonly CancellationTokenSource _updateCts = new();
+    // Written on the UI thread (via Dispatcher), read on the poll thread — volatile for visibility.
+    private volatile string? _updateUrl;            // release page (available state)
+    private volatile string? _downloadedUpdatePath; // set once the background download lands (ready state)
+
     public int ApiPort => _apiPort;
     public string ConfigPath => _configPath;
     public string WindowTitle { get; }
-    public string VersionText { get; }
     public bool HasSelectedService => SelectedService != null;
 
     public MainViewModel(ProcessManager processManager, LogManager logManager, int apiPort, string configPath, string folderName)
@@ -75,6 +89,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         VersionText = version != null ? $"v{version.Major}" : "v0";
+
+        // Start polling GitHub for newer releases in the background.
+        _ = PollForUpdatesAsync(version, _updateCts.Token);
 
         // Initialize service view models
         foreach (var state in processManager.Services.Values)
@@ -203,6 +220,84 @@ public partial class MainViewModel : ObservableObject, IDisposable
         StatusText = $"{running}/{total} services running";
     }
 
+    /// <summary>Background loop: check GitHub for a newer release, then (if found) nudge the
+    /// status-bar version label and download the new build. Silent on every failure — an update
+    /// problem must never disturb service management.</summary>
+    private async Task PollForUpdatesAsync(Version? current, CancellationToken ct)
+    {
+        if (current == null) return;
+
+        // Small initial delay so startup isn't competing with the first network call.
+        try { await Task.Delay(TimeSpan.FromSeconds(5), ct); } catch (TaskCanceledException) { return; }
+
+        while (!ct.IsCancellationRequested)
+        {
+            // Skip the network round-trip once a download is already staged.
+            if (_downloadedUpdatePath == null || !System.IO.File.Exists(_downloadedUpdatePath))
+            {
+                try
+                {
+                    var info = await UpdateChecker.CheckAsync(GitHubRepo, current, ct);
+                    if (info != null) await ApplyUpdateInfoAsync(info, ct);
+                }
+                catch { /* update poll must never crash the app */ }
+            }
+
+            try { await Task.Delay(UpdatePollInterval, ct); } catch (TaskCanceledException) { return; }
+        }
+    }
+
+    /// <summary>Drives the status-bar nudge + background download given a discovered update.</summary>
+    private async Task ApplyUpdateInfoAsync(UpdateInfo info, CancellationToken ct)
+    {
+        var versionStr = $"v{info.LatestVersion.Major}";
+
+        // Phase 1: available — link to the release page while the download streams.
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _updateUrl = info.ReleaseUrl;
+            VersionText = $"{versionStr} ↗";
+            UpdateClickable = true;
+        });
+
+        if (string.IsNullOrEmpty(info.AssetUrl)) return; // no matching .exe asset — manual update only
+
+        // Phase 2: background download to %TEMP%\ServiceHost-update-<version>.exe.
+        var dlPath = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"ServiceHost-update-{info.LatestVersion}.exe");
+        bool ok = await UpdateApplier.DownloadAsync(info.AssetUrl!, dlPath, ct);
+        if (!ok) return; // keep Phase 1 link so the user can still reach the release page
+
+        // Phase 3: ready — click now installs + restarts.
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _downloadedUpdatePath = dlPath;
+            VersionText = $"Update ready — {versionStr}";
+            UpdateClickable = true;
+        });
+    }
+
+    /// <summary>Invoked by the status-bar version click. Available → open the release page;
+    /// ready → install the downloaded build and restart.</summary>
+    public void OnVersionClicked()
+    {
+        if (!string.IsNullOrEmpty(_downloadedUpdatePath) && System.IO.File.Exists(_downloadedUpdatePath))
+        {
+            var currentExe = Environment.ProcessPath; // single-file safe
+            if (string.IsNullOrEmpty(currentExe)) return;
+            UpdateApplier.ApplyAndExit(_downloadedUpdatePath!, currentExe!);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_updateUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_updateUrl) { UseShellExecute = true });
+        }
+        catch { /* opening the browser is a nicety; never crash the app over it */ }
+    }
+
     [RelayCommand]
     private void CopyPrompt()
     {
@@ -262,6 +357,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _updateCts.Cancel();
         _refreshTimer.Stop();
         _logManager.LogLineReceived -= OnLogLineReceived;
         _processManager.StatusChanged -= OnStatusChanged;

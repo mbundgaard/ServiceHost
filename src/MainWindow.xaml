@@ -353,9 +353,22 @@
 
                 <TextBlock Grid.Column="1"
                            Text="{Binding VersionText}"
-                           Foreground="{StaticResource TextSecondaryBrush}"
                            FontSize="11"
-                           VerticalAlignment="Center"/>
+                           VerticalAlignment="Center"
+                           MouseLeftButtonUp="Version_Click">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateClickable}" Value="True">
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                    <Setter Property="ToolTip" Value="Click to update"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </Border>
     </Grid>

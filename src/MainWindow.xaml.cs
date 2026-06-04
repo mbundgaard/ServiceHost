@@ -96,6 +96,14 @@ public partial class MainWindow : Window
     {
         Process.Start(new ProcessStartInfo("https://github.com/mbundgaard/ServiceHost") { UseShellExecute = true });
     }
+
+    private void Version_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.OnVersionClicked();
+        }
+    }
 }
 
 /// <summary>
