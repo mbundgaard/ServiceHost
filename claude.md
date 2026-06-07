@@ -30,7 +30,9 @@ src/
 │   ├── ConfigurationService.cs  # Loads ServiceHost.json
 │   ├── ProcessManager.cs        # Start/stop/monitor processes
 │   ├── LogManager.cs            # Log file management
-│   └── VersionChecker.cs        # GitHub release update checking
+│   ├── UpdateChecker.cs         # Polls GitHub releases for a newer build
+│   ├── UpdateApplier.cs         # Downloads the new exe and swaps it in
+│   └── Relauncher.cs            # Detached helper: wait for exit, swap exe, relaunch
 ├── Api/
 │   └── ApiHost.cs          # HTTP API (ASP.NET Core minimal API)
 └── ViewModels/
