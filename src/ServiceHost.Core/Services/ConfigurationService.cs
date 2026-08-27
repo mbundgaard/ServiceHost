@@ -13,6 +13,7 @@ public class ConfigurationService
 
     public AppConfig Config { get; private set; } = new();
     public string ConfigPath => _configPath;
+    public string ConfigDirectory => Path.GetDirectoryName(_configPath) ?? AppContext.BaseDirectory;
 
     public ConfigurationService()
     {
@@ -21,7 +22,7 @@ public class ConfigurationService
 
     public ConfigurationService(string configPath)
     {
-        _configPath = configPath;
+        _configPath = Path.GetFullPath(configPath);
     }
 
     /// <summary>
@@ -228,7 +229,7 @@ public class ConfigurationService
         var logDir = Config.LogDirectory;
         if (!Path.IsPathRooted(logDir))
         {
-            logDir = Path.Combine(AppContext.BaseDirectory, logDir);
+            logDir = Path.Combine(ConfigDirectory, logDir);
         }
         return Path.GetFullPath(logDir);
     }
@@ -260,6 +261,8 @@ public class ConfigurationService
         {
             WriteIndented = true
         });
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(path, json);
     }
 }

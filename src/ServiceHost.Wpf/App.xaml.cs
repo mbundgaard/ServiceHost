@@ -24,7 +24,7 @@ public partial class App : Application
 
         try
         {
-            _runtime = await ServiceHostRuntime.StartAsync();
+            _runtime = await ServiceHostRuntime.StartAsync(ServiceHostOptions.FromArgs(e.Args));
         }
         catch (Exception ex)
         {
@@ -46,7 +46,7 @@ public partial class App : Application
         _viewModel = new MainViewModel(
             _runtime.ProcessManager,
             _runtime.LogManager,
-            _runtime.ConfigurationService.Config.ApiPort,
+            _runtime.ApiPort,
             _runtime.ConfigurationService.ConfigPath,
             folderName);
 

@@ -10,6 +10,8 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
     public LogManager LogManager { get; }
     public ProcessManager ProcessManager { get; }
     public ApiHost ApiHost { get; }
+    public int ApiPort { get; }
+    public string ProjectDirectory => ConfigurationService.ConfigDirectory;
 
     public event Action? ShutdownRequested;
 
@@ -19,19 +21,24 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
         ConfigurationService configurationService,
         LogManager logManager,
         ProcessManager processManager,
-        ApiHost apiHost)
+        ApiHost apiHost,
+        int apiPort)
     {
         ConfigurationService = configurationService;
         LogManager = logManager;
         ProcessManager = processManager;
         ApiHost = apiHost;
+        ApiPort = apiPort;
 
         ApiHost.ShutdownRequested += OnApiShutdownRequested;
     }
 
-    public static async Task<ServiceHostRuntime> StartAsync(CancellationToken cancellationToken = default)
+    public static async Task<ServiceHostRuntime> StartAsync(ServiceHostOptions? options = null, CancellationToken cancellationToken = default)
     {
-        var configService = new ConfigurationService();
+        options ??= new ServiceHostOptions();
+        var configService = string.IsNullOrWhiteSpace(options.ConfigPath)
+            ? new ConfigurationService()
+            : new ConfigurationService(options.ConfigPath);
         var loaded = await configService.LoadAsync();
 
         if (!loaded)
@@ -40,8 +47,9 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
             await configService.LoadAsync();
         }
 
+        var apiPort = options.ApiPort ?? configService.Config.ApiPort;
         var logManager = new LogManager(configService.GetLogDirectory());
-        var processManager = new ProcessManager(logManager);
+        var processManager = new ProcessManager(logManager, configService.ConfigDirectory);
 
         foreach (var serviceConfig in configService.Config.Services)
         {
@@ -50,8 +58,8 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
 
         processManager.LoadExistingLogs();
 
-        var apiHost = new ApiHost(configService.Config.ApiPort, processManager, logManager, configService);
-        var runtime = new ServiceHostRuntime(configService, logManager, processManager, apiHost);
+        var apiHost = new ApiHost(apiPort, processManager, logManager, configService);
+        var runtime = new ServiceHostRuntime(configService, logManager, processManager, apiHost, apiPort);
         apiHost.Start();
 
         return runtime;

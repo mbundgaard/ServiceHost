@@ -34,7 +34,7 @@ Typical use cases:
 - **Persistent Services** - Services keep running when UI closes
 - **Auto-Reload Config** - Edit `ServiceHost.json` and changes are picked up on next API request
 - **Service CRUD via API** - Create, update, delete services via REST endpoints
-- **Auto-Update Check** - Checks GitHub releases for new versions, includes update instructions in API
+- **Auto-Update Check** - WPF checks GitHub releases and can stage/apply updates
 - **Copy Prompt** - One-click button copies an AI assistant prompt to your clipboard
 - **AI Ready** - API returns self-describing manifest for AI assistants
 
@@ -50,6 +50,15 @@ cd ServiceHost
 .\dev-tui.ps1
 ```
 
+Installed/shared usage from a project root:
+
+```powershell
+servicehost-tui --config .\ServiceHost.json
+
+# Use a runtime API port override when multiple projects run at once
+servicehost-tui --config .\ServiceHost.json --port 9510
+```
+
 Or publish executables:
 
 ```powershell
@@ -59,7 +68,29 @@ Or publish executables:
 
 ## Configuration
 
-Create `ServiceHost.json` next to the executable:
+Create `ServiceHost.json` next to the executable, or pass a project config explicitly:
+
+```powershell
+ServiceHost.Tui.exe --config D:\Source\MyProject\ServiceHost.json --port 9510
+```
+
+Config path resolution order:
+
+1. `--config <path>`
+2. `SERVICEHOST_CONFIG`
+3. `./ServiceHost.json` in the current working directory
+4. `ServiceHost.json` next to the executable
+
+API port resolution order:
+
+1. `--port <port>`
+2. `SERVICEHOST_PORT`
+3. `apiPort` in `ServiceHost.json`
+4. default `9500`
+
+Relative `logDirectory` and service `workingDirectory` values are resolved relative to the config file directory.
+
+Example config:
 
 ```json
 {
@@ -117,6 +148,9 @@ Returns a self-describing manifest with all endpoints, examples, and current ser
   "name": "ServiceHost",
   "version": "9",
   "description": "Service manager with HTTP API for AI assistants",
+  "apiPort": 9500,
+  "configPath": "D:/path/to/ServiceHost.json",
+  "projectDirectory": "D:/path/to",
   "endpoints": {
     "GET /": "API description and service status",
     "GET /services": "List all services",

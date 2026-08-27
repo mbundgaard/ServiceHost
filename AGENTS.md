@@ -86,12 +86,19 @@ Preferred project contract:
 <Project>/AGENTS.md          # documents ServiceHost usage for agents
 ```
 
-Preferred startup command once `--config` support exists:
+Preferred startup command:
 
 ```powershell
 servicehost-tui --config .\ServiceHost.json
 # or explicit installed path:
 D:\Tools\ServiceHost\ServiceHost.Tui.exe --config .\ServiceHost.json
+```
+
+Multiple projects can run concurrently by overriding the API port at runtime:
+
+```powershell
+servicehost-tui --config D:\Source\ProjectA\ServiceHost.json --port 9501
+servicehost-tui --config D:\Source\ProjectB\ServiceHost.json --port 9502
 ```
 
 After ServiceHost is running, agents should control services via the HTTP API, not by launching raw project services directly:
@@ -106,7 +113,7 @@ curl http://localhost:9500/services/<name>/logs?tail=100
 
 Recommended `AGENTS.md` snippet for other projects:
 
-```md
+````md
 ## ServiceHost
 
 This project uses ServiceHost for local dev services.
@@ -117,17 +124,21 @@ Start the ServiceHost TUI from the project root:
 
 ```powershell
 servicehost-tui --config .\ServiceHost.json
+# If port 9500 is already in use, choose a project-specific port:
+servicehost-tui --config .\ServiceHost.json --port 9510
 ```
 
-After it is running, agents should use the API at `http://localhost:9500/` to start/stop/restart services and read logs. Do not start project services directly unless ServiceHost is unavailable.
-```
+After it is running, agents should use the configured API URL, usually `http://localhost:9500/`, to start/stop/restart services and read logs. If `--port` was used, use that port. Do not start project services directly unless ServiceHost is unavailable.
+````
 
 Implementation notes for ServiceHost:
 
-- Add `--config <path>` support to both WPF and TUI.
-- Config path resolution should prefer: `--config`, then `SERVICEHOST_CONFIG`, then `./ServiceHost.json` in current working directory, then executable directory for backwards compatibility.
-- API manifest should expose the resolved `configPath`, project/root directory, and `apiPort` so agents can verify they are talking to the correct ServiceHost instance.
-- Multiple projects can run concurrently by using different `apiPort` values in their checked-in configs.
+- `--config <path>` is supported by both WPF and TUI.
+- `--port <port>` is supported as a runtime-only API port override and does not rewrite `ServiceHost.json`.
+- Config path resolution prefers: `--config`, then `SERVICEHOST_CONFIG`, then `./ServiceHost.json` in current working directory, then executable directory for backwards compatibility.
+- API port resolution prefers: `--port`, then `SERVICEHOST_PORT`, then `apiPort` in config, then default `9500`.
+- API manifest exposes the resolved `apiPort`, `configPath`, and `projectDirectory` so agents can verify they are talking to the correct ServiceHost instance.
+- Multiple projects can run concurrently by using different API ports.
 
 ## HTTP API (localhost:9500)
 

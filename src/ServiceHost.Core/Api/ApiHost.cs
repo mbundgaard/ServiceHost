@@ -92,7 +92,9 @@ public class ApiHost : IDisposable
                 name = "ServiceHost",
                 version = $"{(System.Reflection.Assembly.GetEntryAssembly() ?? System.Reflection.Assembly.GetExecutingAssembly()).GetName().Version?.Major ?? 0}",
                 description = "Service manager with HTTP API for AI assistants",
+                apiPort = _port,
                 configPath = _configPath,
+                projectDirectory = _configService.ConfigDirectory,
                 addingServices = new
                 {
                     instructions = "POST to /services with a JSON body. Required: name, command, port. The service starts automatically after creation if you call the start endpoint.",

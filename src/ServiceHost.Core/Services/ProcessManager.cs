@@ -10,6 +10,7 @@ public class ProcessManager : IDisposable
     private readonly Dictionary<string, ServiceState> _services = new();
     private readonly Dictionary<string, SemaphoreSlim> _serviceLocks = new();
     private readonly object _lockSync = new();
+    private readonly string _baseDirectory;
     private bool _disposed;
 
     public IReadOnlyDictionary<string, ServiceState> Services => _services;
@@ -18,9 +19,12 @@ public class ProcessManager : IDisposable
     public event Action<string, ServiceState>? ServiceAdded;
     public event Action<string>? ServiceRemoved;
 
-    public ProcessManager(LogManager logManager)
+    public ProcessManager(LogManager logManager, string? baseDirectory = null)
     {
         _logManager = logManager;
+        _baseDirectory = string.IsNullOrWhiteSpace(baseDirectory)
+            ? AppContext.BaseDirectory
+            : Path.GetFullPath(baseDirectory);
     }
 
     public void RegisterService(ServiceConfig config)
@@ -188,7 +192,7 @@ public class ProcessManager : IDisposable
                 var workDir = state.Config.WorkingDirectory;
                 if (!Path.IsPathRooted(workDir))
                 {
-                    workDir = Path.Combine(AppContext.BaseDirectory, workDir);
+                    workDir = Path.Combine(_baseDirectory, workDir);
                 }
                 startInfo.WorkingDirectory = Path.GetFullPath(workDir);
             }

@@ -11,7 +11,7 @@ if (ServiceHostRuntime.TryApplyPendingUpdate())
 ServiceHostRuntime runtime;
 try
 {
-    runtime = await ServiceHostRuntime.StartAsync();
+    runtime = await ServiceHostRuntime.StartAsync(ServiceHostOptions.FromArgs(args));
 }
 catch (Exception ex)
 {
@@ -164,7 +164,7 @@ string BuildHeader()
 {
     var running = services.Values.Count(s => s.Status == ServiceStatus.Running);
     var total = services.Count;
-    return $" ServiceHost :{runtime.ConfigurationService.Config.ApiPort}  {running}/{total} running  {runtime.ConfigurationService.ConfigPath}";
+    return $" ServiceHost :{runtime.ApiPort}  {running}/{total} running  {runtime.ConfigurationService.ConfigPath}";
 }
 
 string CompactServiceRow(string name)
