@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ServiceHost.Tui</AssemblyName>
     <RootNamespace>ServiceHost.Tui</RootNamespace>
+    <Version>15.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

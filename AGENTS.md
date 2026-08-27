@@ -75,6 +75,60 @@ Important: `ServiceHost.Tui` must remain a real console app. The project uses:
 
 Do not remove this, or the `.exe` may detach from the terminal instead of rendering in the pane.
 
+## Future Usage Model for Projects
+
+Target model: ServiceHost is installed once, and each project checks in only its own `ServiceHost.json` plus instructions in that project's `AGENTS.md`. Avoid copying `ServiceHost.exe` into every repository.
+
+Preferred project contract:
+
+```text
+<Project>/ServiceHost.json   # checked in
+<Project>/AGENTS.md          # documents ServiceHost usage for agents
+```
+
+Preferred startup command once `--config` support exists:
+
+```powershell
+servicehost-tui --config .\ServiceHost.json
+# or explicit installed path:
+D:\Tools\ServiceHost\ServiceHost.Tui.exe --config .\ServiceHost.json
+```
+
+After ServiceHost is running, agents should control services via the HTTP API, not by launching raw project services directly:
+
+```bash
+curl http://localhost:9500/
+curl http://localhost:9500/services
+curl -X POST http://localhost:9500/services/start
+curl -X POST http://localhost:9500/services/<name>/restart
+curl http://localhost:9500/services/<name>/logs?tail=100
+```
+
+Recommended `AGENTS.md` snippet for other projects:
+
+```md
+## ServiceHost
+
+This project uses ServiceHost for local dev services.
+
+Config: `./ServiceHost.json`
+
+Start the ServiceHost TUI from the project root:
+
+```powershell
+servicehost-tui --config .\ServiceHost.json
+```
+
+After it is running, agents should use the API at `http://localhost:9500/` to start/stop/restart services and read logs. Do not start project services directly unless ServiceHost is unavailable.
+```
+
+Implementation notes for ServiceHost:
+
+- Add `--config <path>` support to both WPF and TUI.
+- Config path resolution should prefer: `--config`, then `SERVICEHOST_CONFIG`, then `./ServiceHost.json` in current working directory, then executable directory for backwards compatibility.
+- API manifest should expose the resolved `configPath`, project/root directory, and `apiPort` so agents can verify they are talking to the correct ServiceHost instance.
+- Multiple projects can run concurrently by using different `apiPort` values in their checked-in configs.
+
 ## HTTP API (localhost:9500)
 
 The API lives in `ServiceHost.Core/Api/ApiHost.cs` and is shared by WPF and TUI.

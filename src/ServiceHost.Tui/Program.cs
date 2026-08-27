@@ -25,6 +25,8 @@ var top = Application.Top;
 var services = runtime.ProcessManager.Services;
 var serviceNames = services.Keys.ToList();
 var selectedServiceName = serviceNames.FirstOrDefault();
+var version = (System.Reflection.Assembly.GetEntryAssembly() ?? System.Reflection.Assembly.GetExecutingAssembly()).GetName().Version;
+var versionText = version != null ? $"v{version.Major}" : "v0";
 
 var header = new Label
 {
@@ -60,6 +62,14 @@ var logView = new TextView
     WordWrap = false
 };
 
+var versionLabel = new Label(versionText)
+{
+    X = Pos.AnchorEnd(versionText.Length + 1),
+    Y = Pos.AnchorEnd(1),
+    Width = versionText.Length,
+    Height = 1
+};
+
 var status = new StatusBar(new[]
 {
     new StatusItem(Key.F2, "F2 Start/Stop", ToggleSelected),
@@ -69,7 +79,7 @@ var status = new StatusBar(new[]
     new StatusItem(Key.CtrlMask | Key.Q, "^Q Quit", Quit)
 });
 
-top.Add(header, serviceList, logTitle, logView, status);
+top.Add(header, serviceList, logTitle, logView, status, versionLabel);
 
 serviceList.SelectedItemChanged += _ =>
 {
@@ -104,6 +114,7 @@ void Refresh()
     var rows = serviceNames.Select(CompactServiceRow).ToList();
 
     header.Text = ustring.Make(BuildHeader());
+    versionLabel.Text = ustring.Make(versionText);
     serviceList.SetSource(rows);
     if (rows.Count > 0)
     {
