@@ -1,6 +1,6 @@
 # ServiceHost
 
-Windows WPF application that manages services with an HTTP API for AI assistants.
+Windows service manager with WPF and TUI front-ends plus an HTTP API for AI assistants.
 
 ## Rules
 

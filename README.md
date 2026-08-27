@@ -1,6 +1,6 @@
 # ServiceHost
 
-A Windows WPF application that manages multiple services with an HTTP API designed for AI assistant integration.
+A Windows service manager with WPF and terminal UIs plus an HTTP API designed for AI assistant integration.
 
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![Windows](https://img.shields.io/badge/Platform-Windows-0078D6)
@@ -27,6 +27,7 @@ Typical use cases:
 ## Features
 
 - **WPF UI** - Dark themed interface with service list, controls, and log viewer
+- **TUI** - Terminal UI for running ServiceHost inside terminal multiplexers such as Herdr
 - **HTTP API** - Self-describing REST API on localhost:9500
 - **Process Management** - Start, stop, restart services with stdout/stderr capture
 - **Shell Mode** - cmd /c args are auto-joined for correct npm/npx PATH propagation
@@ -40,17 +41,20 @@ Typical use cases:
 ## Quick Start
 
 ```powershell
-# Clone and build
+# Clone and run the WPF UI
 git clone https://github.com/mbundgaard/ServiceHost.git
 cd ServiceHost
 .\dev.ps1
+
+# Or run the terminal UI
+.\dev-tui.ps1
 ```
 
-Or publish a single-file executable:
+Or publish executables:
 
 ```powershell
-.\publish.ps1
-# Output: publish/ServiceHost.exe
+.\publish.ps1      # Output: publish/ServiceHost.exe
+.\publish-tui.ps1  # Output: publish-tui/ServiceHost.Tui.exe
 ```
 
 ## Configuration
@@ -186,7 +190,9 @@ curl -X POST http://localhost:9500/shutdown
 
 ## UI
 
-The dark-themed UI provides:
+ServiceHost can be run with either the WPF UI or the terminal UI. Both use the same core runtime and keep the HTTP API available.
+
+The dark-themed WPF UI provides:
 
 - **Service List** - Status indicator, name, and start/stop/restart buttons
 - **Log Viewer** - Real-time log display for selected service
@@ -198,6 +204,16 @@ Status indicators:
 - Gray: Stopped
 - Orange: Starting/Stopping
 - Red: Failed
+
+The TUI provides a service list, selected-service log viewer, and keyboard controls:
+- `F2` start selected
+- `F3` stop selected
+- `F4` restart selected
+- `F5` refresh
+- `F6` start all
+- `F7` stop all
+- `F8` clear selected log
+- `Ctrl+Q` quit UI
 
 ## AI Assistant Integration
 
@@ -230,14 +246,16 @@ ServiceHost automatically checks for updates. When a new version is available, t
 
 Requirements:
 - .NET 8.0 SDK
-- Windows (WPF)
+- Windows
 
 ```powershell
 # Development
-.\dev.ps1
+.\dev.ps1      # WPF
+.\dev-tui.ps1  # TUI
 
-# Publish single-file exe
+# Publish
 .\publish.ps1
+.\publish-tui.ps1
 ```
 
 ## License
