@@ -12,10 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Terminal.Gui" Version="1.17.1" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\ServiceHost.Core\ServiceHost.Core.csproj" />
   </ItemGroup>
 

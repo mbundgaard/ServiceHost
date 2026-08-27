@@ -60,9 +60,11 @@ status bar
 Keyboard controls:
 
 ```text
-F2      Start/stop selected service
-F3      Restart selected service
-F4      Start/stop all services
+F1      Show info popup
+F2      Next service
+F3      Start/stop selected service
+F4      Restart selected service
+F5      Start/stop all services
 Ctrl+L  Clear selected log
 Ctrl+Q  Quit UI; child services keep running
 ```
@@ -79,14 +81,21 @@ Do not remove this, or the `.exe` may detach from the terminal instead of render
 
 Target model: ServiceHost is installed once, and each project checks in only its own `ServiceHost.json` plus instructions in that project's `AGENTS.md`. Avoid copying `ServiceHost.exe` into every repository.
 
-Current local install locations on this machine:
+Current canonical local install location:
+
+```text
+%LOCALAPPDATA%\Programs\ServiceHost
+```
+
+On this machine that expands to:
 
 ```text
 C:\Users\martin\AppData\Local\Programs\ServiceHost
-D:\Source\ServiceHost
 ```
 
-Both locations are registered in the **User PATH**, but existing terminals/panes may not see PATH changes until restarted. In a fresh terminal these commands should work:
+The source root (`D:\Source\ServiceHost`) should not contain runtime exe copies; local root copies were removed to avoid PATH/version confusion.
+
+The `%LOCALAPPDATA%\Programs\ServiceHost` install location is registered in the **User PATH**, but existing terminals/panes may not see PATH changes until restarted. In a fresh terminal these commands should work:
 
 ```powershell
 servicehost
@@ -96,8 +105,8 @@ servicehost-tui
 In an already-open terminal, either use the full path or temporarily refresh PATH:
 
 ```powershell
-$env:Path += ";D:\Source\ServiceHost"
-D:\Source\ServiceHost\servicehost-tui.cmd --config .\ServiceHost.json
+$env:Path += ";$env:LOCALAPPDATA\Programs\ServiceHost"
+$env:LOCALAPPDATA\Programs\ServiceHost\servicehost-tui.cmd --config .\ServiceHost.json
 ```
 
 Preferred project contract:

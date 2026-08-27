@@ -244,10 +244,12 @@ Status indicators:
 - Orange: Starting/Stopping
 - Red: Failed
 
-The TUI uses a stacked layout optimized for Herdr panes: services at the top and selected-service logs below. Keyboard controls:
-- `F2` start/stop selected
-- `F3` restart selected
-- `F4` start/stop all
+The TUI uses a simple plain-text stacked layout optimized for Herdr panes: services at the top and selected-service logs below. Keyboard controls:
+- `F1` show info popup
+- `F2` next service
+- `F3` start/stop selected
+- `F4` restart selected
+- `F5` start/stop all
 - `Ctrl+L` clear selected log
 - `Ctrl+Q` quit UI
 
