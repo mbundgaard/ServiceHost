@@ -9,6 +9,7 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
     public ConfigurationService ConfigurationService { get; }
     public LogManager LogManager { get; }
     public ProcessManager ProcessManager { get; }
+    public CredentialService CredentialService { get; }
     public ApiHost ApiHost { get; }
     public int ApiPort { get; }
     public string ProjectDirectory => ConfigurationService.ConfigDirectory;
@@ -21,12 +22,14 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
         ConfigurationService configurationService,
         LogManager logManager,
         ProcessManager processManager,
+        CredentialService credentialService,
         ApiHost apiHost,
         int apiPort)
     {
         ConfigurationService = configurationService;
         LogManager = logManager;
         ProcessManager = processManager;
+        CredentialService = credentialService;
         ApiHost = apiHost;
         ApiPort = apiPort;
 
@@ -48,8 +51,16 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
         }
 
         var apiPort = options.ApiPort ?? configService.Config.ApiPort;
+        var credentialsPath = options.CredentialsPath;
+        if (string.IsNullOrWhiteSpace(credentialsPath))
+        {
+            var defaultCredentialsPath = Path.Combine(configService.ConfigDirectory, "ServiceHost.credentials.json");
+            if (File.Exists(defaultCredentialsPath)) credentialsPath = defaultCredentialsPath;
+        }
+        var credentialService = new CredentialService(credentialsPath);
+        await credentialService.LoadAsync(configService.Config);
         var logManager = new LogManager(configService.GetLogDirectory());
-        var processManager = new ProcessManager(logManager, configService.ConfigDirectory);
+        var processManager = new ProcessManager(logManager, configService.ConfigDirectory, credentialService);
 
         foreach (var serviceConfig in configService.Config.Services)
         {
@@ -58,8 +69,8 @@ public sealed class ServiceHostRuntime : IAsyncDisposable, IDisposable
 
         processManager.LoadExistingLogs();
 
-        var apiHost = new ApiHost(apiPort, processManager, logManager, configService);
-        var runtime = new ServiceHostRuntime(configService, logManager, processManager, apiHost, apiPort);
+        var apiHost = new ApiHost(apiPort, processManager, logManager, configService, credentialService);
+        var runtime = new ServiceHostRuntime(configService, logManager, processManager, credentialService, apiHost, apiPort);
         apiHost.Start();
 
         return runtime;

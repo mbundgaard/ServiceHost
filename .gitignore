@@ -14,8 +14,15 @@ publish-tui/
 logs/
 *.log
 
+# Local installed release copies
+/ServiceHost.exe
+/ServiceHost.Tui.exe
+/servicehost.cmd
+/servicehost-tui.cmd
+
 # Configuration (keep template)
 ServiceHost.json
+ServiceHost.credentials.json
 
 # OS
 Thumbs.db

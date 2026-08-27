@@ -164,7 +164,12 @@ string BuildHeader()
 {
     var running = services.Values.Count(s => s.Status == ServiceStatus.Running);
     var total = services.Count;
-    return $" ServiceHost :{runtime.ApiPort}  {running}/{total} running  {runtime.ConfigurationService.ConfigPath}";
+    var creds = runtime.CredentialService.Status.Required.Count == 0
+        ? "creds:none"
+        : runtime.CredentialService.Status.AllResolved
+            ? "creds:ok"
+            : $"creds:missing:{runtime.CredentialService.Status.Unresolved.Count}";
+    return $" ServiceHost :{runtime.ApiPort}  {running}/{total} running  {creds}  {runtime.ConfigurationService.ConfigPath}";
 }
 
 string CompactServiceRow(string name)
@@ -172,7 +177,10 @@ string CompactServiceRow(string name)
     var state = services[name];
     var pid = state.ProcessId.HasValue ? $" pid:{state.ProcessId}" : string.Empty;
     var port = state.Config.Port > 0 ? $" :{state.Config.Port}" : string.Empty;
-    return $"{StatusGlyph(state.Status)} {name}  {state.Status}{port}{pid}";
+    var creds = runtime.CredentialService.HasUnresolvedCredentials(name, out var unresolved)
+        ? $" creds:{unresolved.Count}!"
+        : string.Empty;
+    return $"{StatusGlyph(state.Status)} {name}  {state.Status}{port}{pid}{creds}";
 }
 
 string? GetSelectedServiceName()

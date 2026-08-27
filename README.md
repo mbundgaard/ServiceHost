@@ -68,6 +68,8 @@ Or publish executables:
 
 ## Configuration
 
+Projects should check in `ServiceHost.json` with non-secret service configuration only. Real credentials should live in a separate gitignored credentials file and be referenced with placeholders such as `${MUNERIS_KIOSK_DB}`. Session-only credentials may also be uploaded to the API with `POST /credentials/session`; they are kept in memory only, never returned by the API, and cleared on shutdown. The credentials design is documented in `docs/plans/2026-08-27-config-credentials-separation.md`; the API/TUI exposes resolved/unresolved credential status without exposing secret values.
+
 Create `ServiceHost.json` next to the executable, or pass a project config explicitly:
 
 ```powershell
@@ -158,6 +160,8 @@ Returns a self-describing manifest with all endpoints, examples, and current ser
     "PUT /services/{name}": "Update an existing service",
     "DELETE /services/{name}": "Delete a service",
     "GET /services/{name}/logs?tail=N": "Get last N lines of logs",
+    "POST /credentials/session": "Upload session-only credentials as a JSON object; values stay in memory and are never returned",
+    "DELETE /credentials/session": "Clear all session-only credentials from memory",
     "POST /services/start": "Start all services",
     "POST /services/stop": "Stop all services",
     "POST /services/restart": "Restart all services",
@@ -187,6 +191,14 @@ curl -X POST http://localhost:9500/services/api/restart
 
 # Get logs (last 50 lines)
 curl http://localhost:9500/services/api/logs?tail=50
+
+# Upload temporary session-only credentials (values are never returned by API)
+curl -X POST http://localhost:9500/credentials/session \
+  -H "Content-Type: application/json" \
+  -d '{"MUNERIS_KIOSK_DB":"Server=...;Password=..."}'
+
+# Clear session-only credentials
+curl -X DELETE http://localhost:9500/credentials/session
 
 # Create a new service
 curl -X POST http://localhost:9500/services \

@@ -35,7 +35,7 @@ src/
 
 ```powershell
 # Build everything
- dotnet build .\src\ServiceHost.sln
+dotnet build .\src\ServiceHost.sln
 
 # Run front-ends; use one at a time on the default port
 .\dev.ps1          # Build and run WPF UI
@@ -78,6 +78,27 @@ Do not remove this, or the `.exe` may detach from the terminal instead of render
 ## Future Usage Model for Projects
 
 Target model: ServiceHost is installed once, and each project checks in only its own `ServiceHost.json` plus instructions in that project's `AGENTS.md`. Avoid copying `ServiceHost.exe` into every repository.
+
+Current local install locations on this machine:
+
+```text
+C:\Users\martin\AppData\Local\Programs\ServiceHost
+D:\Source\ServiceHost
+```
+
+Both locations are registered in the **User PATH**, but existing terminals/panes may not see PATH changes until restarted. In a fresh terminal these commands should work:
+
+```powershell
+servicehost
+servicehost-tui
+```
+
+In an already-open terminal, either use the full path or temporarily refresh PATH:
+
+```powershell
+$env:Path += ";D:\Source\ServiceHost"
+D:\Source\ServiceHost\servicehost-tui.cmd --config .\ServiceHost.json
+```
 
 Preferred project contract:
 
@@ -136,6 +157,7 @@ Implementation notes for ServiceHost:
 - `--config <path>` is supported by both WPF and TUI.
 - `--port <port>` is supported as a runtime-only API port override and does not rewrite `ServiceHost.json`.
 - Config path resolution prefers: `--config`, then `SERVICEHOST_CONFIG`, then `./ServiceHost.json` in current working directory, then executable directory for backwards compatibility.
+- Credentials path resolution prefers: `--credentials`, then `SERVICEHOST_CREDENTIALS`, then `ServiceHost.credentials.json` next to the resolved config file.
 - API port resolution prefers: `--port`, then `SERVICEHOST_PORT`, then `apiPort` in config, then default `9500`.
 - API manifest exposes the resolved `apiPort`, `configPath`, and `projectDirectory` so agents can verify they are talking to the correct ServiceHost instance.
 - Multiple projects can run concurrently by using different API ports.
@@ -153,6 +175,8 @@ DELETE /services/{name}            → Delete service
 GET    /services/{name}/logs       → Get logs (?tail=N)
 POST   /services/logs/clear        → Clear all logs
 POST   /services/{name}/logs/clear → Clear one log
+POST   /credentials/session        → Upload session-only credentials (memory only; values are never returned)
+DELETE /credentials/session        → Clear session-only credentials from memory
 POST   /services/start             → Start all (parallel)
 POST   /services/stop              → Stop all (parallel)
 POST   /services/restart           → Restart all (parallel)
@@ -168,6 +192,104 @@ Agents should discover current state with:
 curl http://localhost:9500/
 curl http://localhost:9500/services
 ```
+
+For services that use `${NAME}` placeholders, agents should inspect `credentials` in `GET /` and confirm `credentials.allResolved == true` before starting those services. If credentials are provided out-of-band for this session only, upload them with `POST /credentials/session` and re-check the manifest.
+
+## Current Implementation Status
+
+Latest pushed release on `master`: `v18` from commit `5daeff8`.
+
+Credentials separation is implemented locally but, at the time this section was written, not yet committed/pushed. Current local changes include:
+
+- `--credentials <path>` and `SERVICEHOST_CREDENTIALS` support.
+- Project-local default credentials file: `ServiceHost.credentials.json` next to the resolved config file.
+- Flat credentials JSON loading.
+- `${NAME}` placeholder scanning and runtime-only in-memory resolution.
+- Safe HTTP API credential status: placeholder names and resolved/unresolved booleans only.
+- Session-only credential upload endpoints: `POST /credentials/session` and `DELETE /credentials/session`. Values stay in memory, are never returned, and are cleared on shutdown.
+- TUI credential summary in the header: `creds:none`, `creds:ok`, or `creds:missing:N`.
+- Fail-fast service start for unresolved credentials, listing placeholder names only.
+- `.gitignore` entry for `ServiceHost.credentials.json`.
+
+Before continuing from a new session, run:
+
+```powershell
+git status --short
+dotnet build .\src\ServiceHost.sln
+```
+
+## Config/Credentials Separation
+
+Permanent design requirement: project configs may be checked in, credentials must not be checked in.
+
+Projects should check in non-secret service config only:
+
+```text
+<Project>/ServiceHost.json
+```
+
+Real credentials should live outside source control in a project-local gitignored file:
+
+```text
+<Project>/ServiceHost.credentials.json
+```
+
+Checked-in config may use placeholders such as:
+
+```json
+{
+  "environment": {
+    "ConnectionStrings__Default": "${MUNERIS_KIOSK_DB}",
+    "TransactionApi__BaseUrl": "${MUNERIS_KIOSK_TRANSACTION_URL}"
+  }
+}
+```
+
+Local credentials map placeholder names to real values:
+
+```json
+{
+  "MUNERIS_KIOSK_DB": "Server=...;Password=...",
+  "MUNERIS_KIOSK_TRANSACTION_URL": "https://..."
+}
+```
+
+Target commands:
+
+```powershell
+servicehost-tui --config .\ServiceHost.json --credentials .\ServiceHost.credentials.json
+```
+
+Credential rules:
+
+- Resolve `${NAME}` placeholders in memory at runtime only.
+- Never rewrite `ServiceHost.json` with resolved values.
+- Never expose credential values in logs, TUI, or HTTP API.
+- API/TUI may expose placeholder names and resolved/unresolved booleans.
+- Agents may upload temporary credentials with `POST /credentials/session`; uploaded values are session-only memory state, never written to disk, never returned, and cleared on shutdown.
+- Agents may clear session credentials with `DELETE /credentials/session`.
+- API responses from credential endpoints return only safe status: placeholder names, resolved/unresolved booleans, and `sessionCredentialCount`; they must never echo submitted values.
+- Session credentials override file credentials with the same key for the current ServiceHost process only.
+- Agents should verify all required credentials are resolved via the API before starting dependent services.
+
+Session-only credential API examples:
+
+```bash
+# Upload temporary in-memory credentials. The response must not echo values.
+curl -X POST http://localhost:9500/credentials/session \
+  -H "Content-Type: application/json" \
+  -d '{"MUNERIS_KIOSK_DB":"Server=...;Password=...","MUNERIS_KIOSK_TRANSACTION_URL":"https://..."}'
+
+# Verify without reading secret values.
+curl http://localhost:9500/
+# Check credentials.allResolved == true or inspect credentials.unresolved.
+
+# Clear all session-only credentials.
+curl -X DELETE http://localhost:9500/credentials/session
+```
+- Starting a service with unresolved credentials should fail fast and list unresolved placeholder names only.
+
+Detailed design is recorded in `docs/plans/2026-08-27-config-credentials-separation.md`.
 
 ## Configuration (ServiceHost.json)
 

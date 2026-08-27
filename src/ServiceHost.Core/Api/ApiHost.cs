@@ -14,6 +14,7 @@ public class ApiHost : IDisposable
     private readonly ProcessManager _processManager;
     private readonly LogManager _logManager;
     private readonly ConfigurationService _configService;
+    private readonly CredentialService _credentialService;
     private readonly string _configPath;
     private WebApplication? _app;
     private Task? _runTask;
@@ -22,12 +23,13 @@ public class ApiHost : IDisposable
     public bool IsRunning { get; private set; }
     public event Action? ShutdownRequested;
 
-    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService)
+    public ApiHost(int port, ProcessManager processManager, LogManager logManager, ConfigurationService configService, CredentialService credentialService)
     {
         _port = port;
         _processManager = processManager;
         _logManager = logManager;
         _configService = configService;
+        _credentialService = credentialService;
         _configPath = configService.ConfigPath;
     }
 
@@ -36,9 +38,15 @@ public class ApiHost : IDisposable
     /// </summary>
     private async Task<object?> CheckAndApplyConfigChangesAsync(CancellationToken ct)
     {
+        var credentialsChanged = _credentialService.HasCredentialsChanged();
         var changes = await _configService.ReloadIfChangedAsync();
-        if (changes == null || !changes.HasChanges)
+        if (changes == null && !credentialsChanged)
             return null;
+
+        await _credentialService.LoadAsync(_configService.Config);
+
+        if (changes == null || !changes.HasChanges)
+            return new { credentialsReloaded = true };
 
         // Remove deleted services
         foreach (var removed in changes.Removed)
@@ -95,6 +103,23 @@ public class ApiHost : IDisposable
                 apiPort = _port,
                 configPath = _configPath,
                 projectDirectory = _configService.ConfigDirectory,
+                credentials = _credentialService.Status,
+                startup = new
+                {
+                    instructions = "Start one ServiceHost instance per project config. Use --config to point at the checked-in ServiceHost.json, --credentials for the gitignored ServiceHost.credentials.json, and --port to run multiple projects concurrently.",
+                    examples = new[]
+                    {
+                        "servicehost-tui --config .\\ServiceHost.json",
+                        "servicehost-tui --config .\\ServiceHost.json --credentials .\\ServiceHost.credentials.json",
+                        "servicehost-tui --config .\\ServiceHost.json --credentials .\\ServiceHost.credentials.json --port 9510"
+                    },
+                    precedence = new
+                    {
+                        configPath = new[] { "--config", "SERVICEHOST_CONFIG", "./ServiceHost.json", "ServiceHost.json next to executable" },
+                        credentialsPath = new[] { "--credentials", "SERVICEHOST_CREDENTIALS", "ServiceHost.credentials.json next to config" },
+                        apiPort = new[] { "--port", "SERVICEHOST_PORT", "apiPort in config", "9500" }
+                    }
+                },
                 addingServices = new
                 {
                     instructions = "POST to /services with a JSON body. Required: name, command, port. The service starts automatically after creation if you call the start endpoint.",
@@ -103,10 +128,10 @@ public class ApiHost : IDisposable
                         ["name"] = "Unique identifier (required). Used in API paths and log files. Avoid special characters.",
                         ["command"] = "Executable to run (required). Use 'cmd' with args [\"/c\", ...] on Windows for npm/npx/node scripts.",
                         ["args"] = "Array of command-line arguments (optional).",
-                        ["workingDirectory"] = "Working directory for the process (optional). Relative to ServiceHost.exe location.",
+                        ["workingDirectory"] = "Working directory for the process (optional). Relative paths resolve against the ServiceHost.json directory.",
                         ["port"] = "Port the service binds to (required). Identifies the process — used to adopt running instances on startup and kill conflicting processes before start.",
                         ["url"] = "URL shown in UI for quick access (optional). E.g., health endpoint or main page.",
-                        ["environment"] = "Environment variables as key-value pairs (optional)."
+                        ["environment"] = "Environment variables as key-value pairs (optional). Values may use ${NAME} placeholders resolved from the credentials file at runtime; secret values are never returned by the API."
                     },
                     examples = new object[]
                     {
@@ -161,6 +186,8 @@ public class ApiHost : IDisposable
                     ["GET /services/{name}/logs?tail=N"] = "Get last N lines of logs (default 100)",
                     ["POST /services/logs/clear"] = "Clear logs for all services",
                     ["POST /services/{name}/logs/clear"] = "Clear log for one service",
+                    ["POST /credentials/session"] = "Upload session-only credentials as a JSON object. Values stay in memory, are never returned, and are cleared on shutdown.",
+                    ["DELETE /credentials/session"] = "Clear all session-only credentials from memory.",
                     ["POST /services/start"] = "Start all services (parallel)",
                     ["POST /services/stop"] = "Stop all services (parallel)",
                     ["POST /services/restart"] = "Restart all services (parallel)",
@@ -177,7 +204,12 @@ public class ApiHost : IDisposable
                     "Starting an already-running service returns success immediately (idempotent).",
                     "Services keep running even when the UI is closed - they persist until explicitly stopped.",
                     "Use POST/PUT/DELETE /services to create, update, or delete services via API. Changes are persisted to the config file automatically.",
-                    "When updating a running service (PUT), it will be automatically stopped and restarted with the new configuration."
+                    "When updating a running service (PUT), it will be automatically stopped and restarted with the new configuration.",
+                    "Use --config to run ServiceHost from one installed location against a project-local ServiceHost.json.",
+                    "Use --port to run multiple ServiceHost instances for multiple projects at the same time.",
+                    "Use --credentials or a project-local ServiceHost.credentials.json for real secrets. The API only exposes credential names and resolved/unresolved status, never values.",
+                    "For temporary agent-provided secrets, POST a JSON object to /credentials/session. Values are kept in memory only and cleared on shutdown or DELETE /credentials/session.",
+                    "Before starting services that use placeholders, check credentials.allResolved or each credentials.services[].allResolved."
                 },
                 examples = new Dictionary<string, string>
                 {
@@ -370,6 +402,30 @@ public class ApiHost : IDisposable
                 _logManager.ResetLog(name);
             }
             return Results.Json(new { success = true, cleared = names });
+        });
+
+        // POST /credentials/session - Upload session-only credentials (memory only; never returned)
+        _app.MapPost("/credentials/session", async (Dictionary<string, string> credentials) =>
+        {
+            _credentialService.SetSessionCredentials(credentials, _configService.Config);
+            return Results.Json(new
+            {
+                success = true,
+                sessionCredentialCount = _credentialService.Status.SessionCredentialCount,
+                credentials = _credentialService.Status
+            }, new JsonSerializerOptions { WriteIndented = true });
+        });
+
+        // DELETE /credentials/session - Clear session-only credentials
+        _app.MapDelete("/credentials/session", () =>
+        {
+            _credentialService.ClearSessionCredentials(_configService.Config);
+            return Results.Json(new
+            {
+                success = true,
+                sessionCredentialCount = _credentialService.Status.SessionCredentialCount,
+                credentials = _credentialService.Status
+            }, new JsonSerializerOptions { WriteIndented = true });
         });
 
         // POST /services/start - Start all services (parallel)

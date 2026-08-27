@@ -5,11 +5,13 @@ namespace ServiceHost;
 public sealed class ServiceHostOptions
 {
     public string? ConfigPath { get; init; }
+    public string? CredentialsPath { get; init; }
     public int? ApiPort { get; init; }
 
     public static ServiceHostOptions FromArgs(string[] args)
     {
         string? configPath = null;
+        string? credentialsPath = null;
         int? apiPort = null;
 
         for (var i = 0; i < args.Length; i++)
@@ -23,6 +25,14 @@ public sealed class ServiceHostOptions
             {
                 configPath = arg.Substring("--config=".Length);
             }
+            else if (arg.Equals("--credentials", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                credentialsPath = args[++i];
+            }
+            else if (arg.StartsWith("--credentials=", StringComparison.OrdinalIgnoreCase))
+            {
+                credentialsPath = arg.Substring("--credentials=".Length);
+            }
             else if (arg.Equals("--port", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
                 if (int.TryParse(args[++i], out var port)) apiPort = port;
@@ -34,6 +44,7 @@ public sealed class ServiceHostOptions
         }
 
         configPath ??= Environment.GetEnvironmentVariable("SERVICEHOST_CONFIG");
+        credentialsPath ??= Environment.GetEnvironmentVariable("SERVICEHOST_CREDENTIALS");
 
         if (!apiPort.HasValue
             && int.TryParse(Environment.GetEnvironmentVariable("SERVICEHOST_PORT"), out var envPort))
@@ -52,9 +63,25 @@ public sealed class ServiceHostOptions
             configPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, configPath));
         }
 
+        if (string.IsNullOrWhiteSpace(credentialsPath) && !string.IsNullOrWhiteSpace(configPath))
+        {
+            var configDir = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrWhiteSpace(configDir))
+            {
+                var projectCredentials = Path.Combine(configDir, "ServiceHost.credentials.json");
+                if (File.Exists(projectCredentials)) credentialsPath = projectCredentials;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(credentialsPath) && !Path.IsPathRooted(credentialsPath))
+        {
+            credentialsPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, credentialsPath));
+        }
+
         return new ServiceHostOptions
         {
             ConfigPath = configPath,
+            CredentialsPath = credentialsPath,
             ApiPort = apiPort
         };
     }

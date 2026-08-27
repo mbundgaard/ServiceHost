@@ -11,6 +11,7 @@ public class ProcessManager : IDisposable
     private readonly Dictionary<string, SemaphoreSlim> _serviceLocks = new();
     private readonly object _lockSync = new();
     private readonly string _baseDirectory;
+    private readonly CredentialService? _credentialService;
     private bool _disposed;
 
     public IReadOnlyDictionary<string, ServiceState> Services => _services;
@@ -19,9 +20,10 @@ public class ProcessManager : IDisposable
     public event Action<string, ServiceState>? ServiceAdded;
     public event Action<string>? ServiceRemoved;
 
-    public ProcessManager(LogManager logManager, string? baseDirectory = null)
+    public ProcessManager(LogManager logManager, string? baseDirectory = null, CredentialService? credentialService = null)
     {
         _logManager = logManager;
+        _credentialService = credentialService;
         _baseDirectory = string.IsNullOrWhiteSpace(baseDirectory)
             ? AppContext.BaseDirectory
             : Path.GetFullPath(baseDirectory);
@@ -141,6 +143,15 @@ public class ProcessManager : IDisposable
                 return (true, null);
             }
 
+            if (_credentialService != null && _credentialService.HasUnresolvedCredentials(name, out var unresolvedCredentials))
+            {
+                var error = $"Unresolved credentials: {string.Join(", ", unresolvedCredentials)}";
+                _logManager.WriteLine(name, error);
+                state.SetFailed(error);
+                StatusChanged?.Invoke(name, ServiceStatus.Failed);
+                return (false, error);
+            }
+
             state.Status = ServiceStatus.Starting;
             StatusChanged?.Invoke(name, ServiceStatus.Starting);
 
@@ -156,13 +167,15 @@ public class ProcessManager : IDisposable
                 }
             }
 
-            // Reset log file
+            var startConfig = _credentialService?.Resolve(state.Config) ?? state.Config;
+
+            // Reset log file. Log the raw command with placeholders, never resolved secret values.
             _logManager.ResetLog(name);
             _logManager.WriteLine(name, $"Starting service: {state.Config.Command} {string.Join(" ", state.Config.Args)}");
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = state.Config.Command,
+                FileName = startConfig.Command,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -171,9 +184,9 @@ public class ProcessManager : IDisposable
 
             // When command is cmd /c, join remaining args into a single command string
             // so that shell environment (e.g. npm's PATH setup) propagates correctly
-            var args = state.Config.Args;
+            var args = startConfig.Args;
             if (args.Count >= 2
-                && state.Config.Command.Equals("cmd", StringComparison.OrdinalIgnoreCase)
+                && startConfig.Command.Equals("cmd", StringComparison.OrdinalIgnoreCase)
                 && args[0].Equals("/c", StringComparison.OrdinalIgnoreCase))
             {
                 startInfo.ArgumentList.Add("/c");
@@ -187,9 +200,9 @@ public class ProcessManager : IDisposable
                 }
             }
 
-            if (!string.IsNullOrEmpty(state.Config.WorkingDirectory))
+            if (!string.IsNullOrEmpty(startConfig.WorkingDirectory))
             {
-                var workDir = state.Config.WorkingDirectory;
+                var workDir = startConfig.WorkingDirectory;
                 if (!Path.IsPathRooted(workDir))
                 {
                     workDir = Path.Combine(_baseDirectory, workDir);
@@ -197,9 +210,9 @@ public class ProcessManager : IDisposable
                 startInfo.WorkingDirectory = Path.GetFullPath(workDir);
             }
 
-            if (state.Config.Environment != null)
+            if (startConfig.Environment != null)
             {
-                foreach (var (key, value) in state.Config.Environment)
+                foreach (var (key, value) in startConfig.Environment)
                 {
                     startInfo.Environment[key] = value;
                 }
