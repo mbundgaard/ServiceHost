@@ -26,7 +26,7 @@ var services = runtime.ProcessManager.Services;
 var serviceNames = services.Keys.ToList();
 var selectedServiceName = serviceNames.FirstOrDefault();
 
-var header = new Label($" ServiceHost TUI  API: http://localhost:{runtime.ConfigurationService.Config.ApiPort}/  Config: {runtime.ConfigurationService.ConfigPath}")
+var header = new Label
 {
     X = 0,
     Y = 0,
@@ -38,14 +38,22 @@ var serviceList = new ListView(serviceNames)
 {
     X = 0,
     Y = 1,
-    Width = 34,
-    Height = Dim.Fill(1)
+    Width = Dim.Fill(),
+    Height = 8
+};
+
+var logTitle = new Label
+{
+    X = 0,
+    Y = Pos.Bottom(serviceList),
+    Width = Dim.Fill(),
+    Height = 1
 };
 
 var logView = new TextView
 {
-    X = Pos.Right(serviceList),
-    Y = 1,
+    X = 0,
+    Y = Pos.Bottom(logTitle),
     Width = Dim.Fill(),
     Height = Dim.Fill(1),
     ReadOnly = true,
@@ -54,17 +62,14 @@ var logView = new TextView
 
 var status = new StatusBar(new[]
 {
-    new StatusItem(Key.F5, "F5 Refresh", Refresh),
-    new StatusItem(Key.F2, "F2 Start", () => RunSelected(runtime.ProcessManager.StartServiceAsync)),
-    new StatusItem(Key.F3, "F3 Stop", () => RunSelected(runtime.ProcessManager.StopServiceAsync)),
-    new StatusItem(Key.F4, "F4 Restart", () => RunSelected(runtime.ProcessManager.RestartServiceAsync)),
-    new StatusItem(Key.F6, "F6 Start All", StartAll),
-    new StatusItem(Key.F7, "F7 Stop All", StopAll),
-    new StatusItem(Key.F8, "F8 Clear Log", ClearSelectedLog),
+    new StatusItem(Key.F2, "F2 Start/Stop", ToggleSelected),
+    new StatusItem(Key.F3, "F3 Restart", () => RunSelected(runtime.ProcessManager.RestartServiceAsync)),
+    new StatusItem(Key.F4, "F4 All Start/Stop", ToggleAll),
+    new StatusItem(Key.CtrlMask | Key.L, "^L Clear Log", ClearSelectedLog),
     new StatusItem(Key.CtrlMask | Key.Q, "^Q Quit", Quit)
 });
 
-top.Add(header, serviceList, logView, status);
+top.Add(header, serviceList, logTitle, logView, status);
 
 serviceList.SelectedItemChanged += _ =>
 {
@@ -93,27 +98,70 @@ void Refresh()
         selectedServiceName = serviceNames.FirstOrDefault();
     }
 
-    var rows = serviceNames.Select(name =>
-    {
-        var state = services[name];
-        var pid = state.ProcessId.HasValue ? $" pid:{state.ProcessId}" : string.Empty;
-        return $"{StatusGlyph(state.Status)} {name,-20} {state.Status}{pid}";
-    }).ToList();
+    ApplyLayout();
 
+    var selectedIndex = selectedServiceName == null ? 0 : Math.Max(0, serviceNames.IndexOf(selectedServiceName));
+    var rows = serviceNames.Select(CompactServiceRow).ToList();
+
+    header.Text = ustring.Make(BuildHeader());
     serviceList.SetSource(rows);
+    if (rows.Count > 0)
+    {
+        serviceList.SelectedItem = Math.Min(selectedIndex, rows.Count - 1);
+    }
+
     RefreshLog();
     Application.Refresh();
+}
+
+void ApplyLayout()
+{
+    serviceList.X = 0;
+    serviceList.Y = 1;
+    serviceList.Width = Dim.Fill();
+    serviceList.Height = Math.Min(10, Math.Max(5, services.Count + 2));
+
+    logTitle.X = 0;
+    logTitle.Y = Pos.Bottom(serviceList);
+    logTitle.Width = Dim.Fill();
+    logTitle.Height = 1;
+
+    logView.X = 0;
+    logView.Y = Pos.Bottom(logTitle);
+    logView.Width = Dim.Fill();
+    logView.Height = Dim.Fill(1);
 }
 
 void RefreshLog()
 {
     selectedServiceName = GetSelectedServiceName() ?? selectedServiceName;
-    var text = selectedServiceName == null
-        ? "No service selected."
-        : runtime.LogManager.GetLogContent(selectedServiceName);
 
-    logView.Text = ustring.Make(text);
+    if (selectedServiceName == null)
+    {
+        logTitle.Text = ustring.Make(" Logs — no service selected");
+        logView.Text = ustring.Make("No service selected.");
+        return;
+    }
+
+    var state = services[selectedServiceName];
+    logTitle.Text = ustring.Make($" Logs — {selectedServiceName} [{state.Status}]  {state.Config.Command} {string.Join(" ", state.Config.Args)}");
+    logView.Text = ustring.Make(runtime.LogManager.GetLogContent(selectedServiceName));
     logView.MoveEnd();
+}
+
+string BuildHeader()
+{
+    var running = services.Values.Count(s => s.Status == ServiceStatus.Running);
+    var total = services.Count;
+    return $" ServiceHost :{runtime.ConfigurationService.Config.ApiPort}  {running}/{total} running  {runtime.ConfigurationService.ConfigPath}";
+}
+
+string CompactServiceRow(string name)
+{
+    var state = services[name];
+    var pid = state.ProcessId.HasValue ? $" pid:{state.ProcessId}" : string.Empty;
+    var port = state.Config.Port > 0 ? $" :{state.Config.Port}" : string.Empty;
+    return $"{StatusGlyph(state.Status)} {name}  {state.Status}{port}{pid}";
 }
 
 string? GetSelectedServiceName()
@@ -144,22 +192,37 @@ void RunSelected(Func<string, CancellationToken, Task<(bool success, string? err
     });
 }
 
-void StartAll()
+void ToggleSelected()
 {
-    _ = Task.Run(async () =>
-    {
-        await Task.WhenAll(services.Keys.Select(name => runtime.ProcessManager.StartServiceAsync(name)));
-        Application.MainLoop.Invoke(Refresh);
-    });
+    var name = GetSelectedServiceName();
+    if (name == null || !services.TryGetValue(name, out var state)) return;
+
+    Func<string, CancellationToken, Task<(bool success, string? error)>> action =
+        state.Status == ServiceStatus.Running || state.Status == ServiceStatus.Starting
+            ? runtime.ProcessManager.StopServiceAsync
+            : runtime.ProcessManager.StartServiceAsync;
+    RunSelected(action);
 }
 
-void StopAll()
+void ToggleAll()
 {
-    _ = Task.Run(async () =>
+    var anyRunning = services.Values.Any(s => s.Status == ServiceStatus.Running || s.Status == ServiceStatus.Starting);
+    if (anyRunning)
     {
-        await runtime.ProcessManager.StopAllServicesAsync();
-        Application.MainLoop.Invoke(Refresh);
-    });
+        _ = Task.Run(async () =>
+        {
+            await runtime.ProcessManager.StopAllServicesAsync();
+            Application.MainLoop.Invoke(Refresh);
+        });
+    }
+    else
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.WhenAll(services.Keys.Select(name => runtime.ProcessManager.StartServiceAsync(name)));
+            Application.MainLoop.Invoke(Refresh);
+        });
+    }
 }
 
 void ClearSelectedLog()

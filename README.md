@@ -71,6 +71,7 @@ Create `ServiceHost.json` next to the executable:
       "command": "dotnet",
       "args": ["run"],
       "workingDirectory": "./api",
+      "port": 5000,
       "url": "http://localhost:5000/health",
       "environment": {
         "ASPNETCORE_ENVIRONMENT": "Development"
@@ -81,6 +82,7 @@ Create `ServiceHost.json` next to the executable:
       "command": "cmd",
       "args": ["/c", "npm", "run", "dev"],
       "workingDirectory": "./app",
+      "port": 5173,
       "url": "http://localhost:5173"
     }
   ]
@@ -95,6 +97,7 @@ Create `ServiceHost.json` next to the executable:
 | `command` | Executable to run. Use `cmd` with `["/c", ...]` args on Windows for npm/npx |
 | `args` | Command-line arguments (array) |
 | `workingDirectory` | Working directory for the process |
+| `port` | Required port the service binds to; used for process adoption and conflict cleanup |
 | `url` | Clickable URL shown in UI (e.g., health endpoint or main page) |
 | `environment` | Environment variables (optional) |
 | `shutdownTimeoutSeconds` | Graceful shutdown timeout (default: 5) |
@@ -114,14 +117,6 @@ Returns a self-describing manifest with all endpoints, examples, and current ser
   "name": "ServiceHost",
   "version": "9",
   "description": "Service manager with HTTP API for AI assistants",
-  "update": {
-    "currentVersion": "8",
-    "newVersion": "9",
-    "downloadUrl": "https://github.com/mbundgaard/ServiceHost/releases/latest/download/ServiceHost.exe",
-    "exePath": "C:/path/to/ServiceHost.exe",
-    "processId": 12345,
-    "instructions": "To update: 1) Download from downloadUrl to exePath.tmp, 2) POST /shutdown, 3) Wait for processId to exit, 4) Delete exePath, 5) Rename exePath.tmp to exePath, 6) Start exePath"
-  },
   "endpoints": {
     "GET /": "API description and service status",
     "GET /services": "List all services",
@@ -140,8 +135,6 @@ Returns a self-describing manifest with all endpoints, examples, and current ser
   "services": [...]
 }
 ```
-
-The `update` section only appears when a new version is available. It includes step-by-step instructions for AI assistants to perform the update automatically.
 
 ### Examples
 
@@ -205,14 +198,11 @@ Status indicators:
 - Orange: Starting/Stopping
 - Red: Failed
 
-The TUI provides a service list, selected-service log viewer, and keyboard controls:
-- `F2` start selected
-- `F3` stop selected
-- `F4` restart selected
-- `F5` refresh
-- `F6` start all
-- `F7` stop all
-- `F8` clear selected log
+The TUI uses a stacked layout optimized for Herdr panes: services at the top and selected-service logs below. Keyboard controls:
+- `F2` start/stop selected
+- `F3` restart selected
+- `F4` start/stop all
+- `Ctrl+L` clear selected log
 - `Ctrl+Q` quit UI
 
 ## AI Assistant Integration
@@ -234,13 +224,22 @@ Services persist when the UI closes, so you can:
 
 ## Releases & Updates
 
-Download the latest release from [GitHub Releases](https://github.com/mbundgaard/ServiceHost/releases/latest/download/ServiceHost.exe).
+Download the latest release assets from GitHub Releases:
 
-ServiceHost automatically checks for updates. When a new version is available, the API includes an `update` section with:
-- Current and new version numbers
-- Download URL
-- Executable path and process ID
-- Step-by-step instructions for AI assistants to perform the update
+- WPF: [ServiceHost.exe](https://github.com/mbundgaard/ServiceHost/releases/latest/download/ServiceHost.exe)
+- TUI: [ServiceHost.Tui.exe](https://github.com/mbundgaard/ServiceHost/releases/latest/download/ServiceHost.Tui.exe)
+
+The WPF front-end checks GitHub releases for updates in the background and can stage/apply a downloaded update. The shared update/relaunch helpers live in `ServiceHost.Core`.
+
+## Project Structure
+
+```text
+src/
+├── ServiceHost.sln
+├── ServiceHost.Core/   # shared config/process/log/API/runtime
+├── ServiceHost.Wpf/    # WPF front-end
+└── ServiceHost.Tui/    # Terminal.Gui front-end
+```
 
 ## Building
 
