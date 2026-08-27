@@ -9,8 +9,10 @@ Windows WPF application that manages services with an HTTP API for AI assistants
 ## Build Commands
 
 ```powershell
-.\dev.ps1      # Build and run
-.\publish.ps1  # Create publish/ServiceHost.exe
+.\dev.ps1          # Build and run WPF UI
+.\dev-tui.ps1      # Build and run TUI
+.\publish.ps1      # Create publish/ServiceHost.exe
+.\publish-tui.ps1  # Create publish-tui/ServiceHost.Tui.exe
 ```
 
 ## Releases
@@ -21,22 +23,18 @@ Automated via GitHub Actions. Every push to `master` triggers `.github/workflows
 
 ```
 src/
-├── App.xaml(.cs)           # Application startup, dependency wiring, crash handlers
-├── MainWindow.xaml(.cs)    # WPF UI, dark theme
-├── Models/
-│   ├── ServiceConfig.cs    # JSON config model
-│   └── ServiceState.cs     # Runtime state (MVVM observable)
-├── Services/
-│   ├── ConfigurationService.cs  # Loads ServiceHost.json
-│   ├── ProcessManager.cs        # Start/stop/monitor processes
-│   ├── LogManager.cs            # Log file management
-│   ├── UpdateChecker.cs         # Polls GitHub releases for a newer build
-│   ├── UpdateApplier.cs         # Downloads the new exe and swaps it in
-│   └── Relauncher.cs            # Detached helper: wait for exit, swap exe, relaunch
-├── Api/
-│   └── ApiHost.cs          # HTTP API (ASP.NET Core minimal API)
-└── ViewModels/
-    └── MainViewModel.cs    # MVVM bindings
+├── ServiceHost.sln
+├── ServiceHost.Core/            # Shared runtime used by WPF and TUI
+│   ├── ServiceHostRuntime.cs    # Dependency wiring/startup/shutdown
+│   ├── Models/                  # JSON config + runtime state
+│   ├── Services/                # Config, process, logs, updates, relaunch
+│   └── Api/ApiHost.cs           # HTTP API (ASP.NET Core minimal API)
+├── ServiceHost.Wpf/             # Windows WPF front-end
+│   ├── App.xaml(.cs)
+│   ├── MainWindow.xaml(.cs)
+│   └── ViewModels/MainViewModel.cs
+└── ServiceHost.Tui/             # Terminal.Gui front-end
+    └── Program.cs
 ```
 
 ## HTTP API (localhost:9500)

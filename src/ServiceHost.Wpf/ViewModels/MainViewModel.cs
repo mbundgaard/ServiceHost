@@ -87,7 +87,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _configPath = configPath;
         WindowTitle = $"ServiceHost — {folderName}";
 
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        var version = (Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()).GetName().Version;
         VersionText = version != null ? $"v{version.Major}" : "v0";
 
         // Start polling GitHub for newer releases in the background.
@@ -287,6 +287,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var currentExe = Environment.ProcessPath; // single-file safe
             if (string.IsNullOrEmpty(currentExe)) return;
             UpdateApplier.ApplyAndExit(_downloadedUpdatePath!, currentExe!);
+            Application.Current.Shutdown();
             return;
         }
 

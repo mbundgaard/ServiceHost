@@ -1,6 +1,5 @@
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 
 namespace ServiceHost.Services;
 
@@ -46,12 +45,12 @@ public static class UpdateApplier
         }
     }
 
-    /// <summary>Hands the swap off to a detached helper and shuts down the app.
+    /// <summary>Hands the swap off to a detached helper.
     /// The helper Wait-Processes on the current PID, moves the downloaded exe over the
-    /// current one, then launches it — see <see cref="Relauncher"/> for the mechanics.</summary>
+    /// current one, then launches it — see <see cref="Relauncher"/> for the mechanics.
+    /// The caller is responsible for exiting its UI/process after invoking this method.</summary>
     public static void ApplyAndExit(string downloadedExe, string currentExe)
     {
         Relauncher.RelaunchAfterExit(currentExe, swapFromPath: downloadedExe);
-        Application.Current.Shutdown();
     }
 }

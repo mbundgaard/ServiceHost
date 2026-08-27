@@ -4,7 +4,7 @@ $publishDir = Join-Path $PSScriptRoot "publish"
 
 Push-Location $srcDir
 try {
-    dotnet publish -c Release -r win-x64 -o $publishDir
+    dotnet publish ServiceHost.Wpf\ServiceHost.csproj -c Release -r win-x64 -o $publishDir
 
     Write-Host ""
     Write-Host "Published to: $publishDir" -ForegroundColor Green

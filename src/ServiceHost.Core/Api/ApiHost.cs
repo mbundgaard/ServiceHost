@@ -90,7 +90,7 @@ public class ApiHost : IDisposable
             var manifest = new
             {
                 name = "ServiceHost",
-                version = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.Major ?? 0}",
+                version = $"{(System.Reflection.Assembly.GetEntryAssembly() ?? System.Reflection.Assembly.GetExecutingAssembly()).GetName().Version?.Major ?? 0}",
                 description = "Service manager with HTTP API for AI assistants",
                 configPath = _configPath,
                 addingServices = new
