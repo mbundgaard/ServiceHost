@@ -28,6 +28,7 @@ var version = (System.Reflection.Assembly.GetEntryAssembly() ?? System.Reflectio
 var versionText = version != null ? $"v{version.Major}" : "v0";
 var dirty = true;
 var running = true;
+var showServices = true;
 
 runtime.LogManager.LogLineReceived += (_, _) => dirty = true;
 runtime.ProcessManager.StatusChanged += (_, _) => dirty = true;
@@ -81,32 +82,37 @@ string BuildScreen(int width, int height)
     var footerSeparatorY = height - 2;
     var footerY = height - 1;
 
-    AppendLine(sb, Fit("Services", width));
+    var usedRows = 0;
 
-    var maxServiceRows = Math.Max(1, Math.Min(serviceNames.Count, height / 3));
-    var firstServiceIndex = Math.Max(0, selectedIndex - maxServiceRows + 1);
-    if (firstServiceIndex + maxServiceRows > serviceNames.Count)
+    if (showServices)
     {
-        firstServiceIndex = Math.Max(0, serviceNames.Count - maxServiceRows);
-    }
-
-    for (var row = 0; row < maxServiceRows; row++)
-    {
-        var index = firstServiceIndex + row;
-        if (index < serviceNames.Count)
+        var maxServiceRows = Math.Max(1, Math.Min(serviceNames.Count, height / 3));
+        var firstServiceIndex = Math.Max(0, selectedIndex - maxServiceRows + 1);
+        if (firstServiceIndex + maxServiceRows > serviceNames.Count)
         {
-            AppendLine(sb, Fit(ServiceRow(index), width));
+            firstServiceIndex = Math.Max(0, serviceNames.Count - maxServiceRows);
         }
+
+        for (var row = 0; row < maxServiceRows; row++)
+        {
+            var index = firstServiceIndex + row;
+            if (index < serviceNames.Count)
+            {
+                AppendLine(sb, Fit(ServiceRow(index), width));
+            }
+        }
+
+        usedRows = maxServiceRows;
+        if (serviceNames.Count > maxServiceRows)
+        {
+            AppendLine(sb, Fit($"  ... {serviceNames.Count - maxServiceRows} more; F2 cycles services", width));
+            usedRows++;
+        }
+
+        AppendLine(sb, Rule(width));
+        usedRows++;
     }
 
-    if (serviceNames.Count > maxServiceRows)
-    {
-        AppendLine(sb, Fit($"  ... {serviceNames.Count - maxServiceRows} more; F2 cycles services", width));
-    }
-
-    AppendLine(sb, Rule(width));
-
-    var usedRows = 2 + maxServiceRows + (serviceNames.Count > maxServiceRows ? 1 : 0);
     var selectedService = GetSelectedServiceName();
     var logLines = GetLogLines(selectedService).ToList();
     var logHeight = Math.Max(0, footerSeparatorY - usedRows);
@@ -119,7 +125,7 @@ string BuildScreen(int width, int height)
     }
 
     AppendLine(sb, Rule(width));
-    sb.Append(FitFooter("F1 info  F2 next service  F3 start/stop  F4 restart  F5 start/stop all  ^L clear log  ^Q quit", versionText, width));
+    sb.Append(FitFooter("F1 info  F2 next service  F3 start/stop  F4 restart  F5 start/stop all  F6 services  ^L clear  ^Q quit", versionText, width));
 
     return sb.ToString();
 }
@@ -184,6 +190,9 @@ void HandleKey(ConsoleKeyInfo key)
             break;
         case ConsoleKey.F5:
             ToggleAll();
+            break;
+        case ConsoleKey.F6:
+            showServices = !showServices;
             break;
         case ConsoleKey.L when key.Modifiers.HasFlag(ConsoleModifiers.Control):
             ClearSelectedLog();

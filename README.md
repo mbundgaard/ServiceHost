@@ -250,6 +250,7 @@ The TUI uses a simple plain-text stacked layout optimized for Herdr panes: servi
 - `F3` start/stop selected
 - `F4` restart selected
 - `F5` start/stop all
+- `F6` show/hide services list
 - `Ctrl+L` clear selected log
 - `Ctrl+Q` quit UI
 

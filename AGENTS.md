@@ -65,6 +65,7 @@ F2      Next service
 F3      Start/stop selected service
 F4      Restart selected service
 F5      Start/stop all services
+F6      Show/hide services list
 Ctrl+L  Clear selected log
 Ctrl+Q  Quit UI; child services keep running
 ```
@@ -337,6 +338,62 @@ Required fields: `name`, `command`, `port`.
 - **Name Validation**: Service names validated against invalid filename chars and Windows reserved names.
 - **Crash Handling**: WPF has dialog crash reporting; TUI should prefer terminal-safe error reporting.
 
-## Releases
+## Releases and Local Installation
 
-Automated via GitHub Actions. Every push to `master` triggers `.github/workflows/release.yml`, auto-increments version from git tags, publishes both WPF and TUI executables, and creates a GitHub release.
+Automated releases are created by GitHub Actions. Every push to `master` triggers `.github/workflows/release.yml`, auto-increments version from git tags, publishes both WPF and TUI executables, and creates a GitHub release.
+
+Release assets:
+
+```text
+ServiceHost.exe
+ServiceHost.Tui.exe
+```
+
+Canonical local install location:
+
+```text
+%LOCALAPPDATA%\Programs\ServiceHost
+```
+
+This is a normal PATH-based tool install, not a Pi/Herdr extension. The install folder should contain:
+
+```text
+ServiceHost.exe
+ServiceHost.Tui.exe
+servicehost.cmd
+servicehost-tui.cmd
+```
+
+The `.cmd` files are simple shims so users and agents can run:
+
+```powershell
+servicehost
+servicehost-tui
+```
+
+Current manual install/update process from a machine with GitHub CLI:
+
+```powershell
+$installDir = Join-Path $env:LOCALAPPDATA "Programs\ServiceHost"
+New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+gh release download --repo mbundgaard/ServiceHost --dir $installDir --clobber --pattern "ServiceHost*.exe"
+
+Set-Content -Path (Join-Path $installDir "servicehost.cmd") -Value "@echo off`r`n`"%~dp0ServiceHost.exe`" %*" -Encoding ASCII
+Set-Content -Path (Join-Path $installDir "servicehost-tui.cmd") -Value "@echo off`r`n`"%~dp0ServiceHost.Tui.exe`" %*" -Encoding ASCII
+
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ";") -notcontains $installDir) {
+    [Environment]::SetEnvironmentVariable("Path", (($userPath.TrimEnd(";"), $installDir) -join ";"), "User")
+}
+```
+
+Existing terminals/panes may not see PATH changes until restarted. In an already-open terminal, temporarily add it with:
+
+```powershell
+$env:Path += ";$env:LOCALAPPDATA\Programs\ServiceHost"
+```
+
+Do not keep runtime exe copies in project roots long-term; use the canonical install folder to avoid PATH/version confusion.
+
+Future improvement: add an `install.ps1` script that performs the download, shim creation, unblock, and PATH registration automatically.
