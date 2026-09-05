@@ -50,6 +50,13 @@ cd ServiceHost
 .\dev-tui.ps1
 ```
 
+Install once so the commands are available from other sessions:
+
+```powershell
+.\install.ps1                 # publish local source and install to %LOCALAPPDATA%\Programs\ServiceHost
+.\install.ps1 -Source Release # or install latest GitHub release
+```
+
 Installed/shared usage from a project root:
 
 ```powershell
@@ -59,7 +66,7 @@ servicehost-tui --config .\ServiceHost.json
 servicehost-tui --config .\ServiceHost.json --port 9510
 ```
 
-Or publish executables:
+Or publish executables without installing:
 
 ```powershell
 .\publish.ps1      # Output: publish/ServiceHost.exe

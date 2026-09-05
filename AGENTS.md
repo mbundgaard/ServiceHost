@@ -371,22 +371,19 @@ servicehost
 servicehost-tui
 ```
 
-Current manual install/update process from a machine with GitHub CLI:
+Install/update from local source so ServiceHost is available to other sessions:
 
 ```powershell
-$installDir = Join-Path $env:LOCALAPPDATA "Programs\ServiceHost"
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-gh release download --repo mbundgaard/ServiceHost --dir $installDir --clobber --pattern "ServiceHost*.exe"
-
-Set-Content -Path (Join-Path $installDir "servicehost.cmd") -Value "@echo off`r`n`"%~dp0ServiceHost.exe`" %*" -Encoding ASCII
-Set-Content -Path (Join-Path $installDir "servicehost-tui.cmd") -Value "@echo off`r`n`"%~dp0ServiceHost.Tui.exe`" %*" -Encoding ASCII
-
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if (($userPath -split ";") -notcontains $installDir) {
-    [Environment]::SetEnvironmentVariable("Path", (($userPath.TrimEnd(";"), $installDir) -join ";"), "User")
-}
+.\install.ps1
 ```
+
+Install/update from the latest GitHub release instead:
+
+```powershell
+.\install.ps1 -Source Release
+```
+
+The script publishes/downloads both front-ends, creates `servicehost.cmd` and `servicehost-tui.cmd`, unblocks downloaded executables, registers the install folder in the User PATH, and refreshes PATH for the current process.
 
 Existing terminals/panes may not see PATH changes until restarted. In an already-open terminal, temporarily add it with:
 
@@ -396,4 +393,4 @@ $env:Path += ";$env:LOCALAPPDATA\Programs\ServiceHost"
 
 Do not keep runtime exe copies in project roots long-term; use the canonical install folder to avoid PATH/version confusion.
 
-Future improvement: add an `install.ps1` script that performs the download, shim creation, unblock, and PATH registration automatically.
+If commands are unavailable in a newly opened session, verify the User PATH contains `%LOCALAPPDATA%\Programs\ServiceHost` and rerun `install.ps1` if needed.
